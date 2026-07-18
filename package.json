@@ -1,0 +1,20 @@
+{
+  "name": "finance-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build:app": "vite build",
+    "build": "npm run build:app && bash scripts/deploy-frontend.sh",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "3.0.10",
+    "@sveltejs/kit": "2.70.0",
+    "@sveltejs/vite-plugin-svelte": "5.1.1",
+    "svelte": "5.56.6",
+    "typescript": "5.9.3",
+    "vite": "6.4.3"
+  }
+}

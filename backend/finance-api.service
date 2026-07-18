@@ -1,0 +1,14 @@
+[Unit]
+Description=Finance API
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/finance-api
+Environment=FINANCE_PORT=3900
+Environment=FINANCE_DATA_DIR=/var/lib/finance
+ExecStart=/usr/bin/node build/index.js
+Restart=always
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
