@@ -29,6 +29,16 @@ export function validateTransaction(
     }
   }
 
+  if (!partial || body.description !== undefined) {
+    if (body.description !== undefined && body.description !== null) {
+      if (typeof body.description !== 'string') {
+        errors.push({ field: 'description', message: 'description must be a string' });
+      } else if (body.description.length > 200) {
+        errors.push({ field: 'description', message: 'description must be at most 200 characters' });
+      }
+    }
+  }
+
   if (!partial || body.category !== undefined) {
     if (typeof body.category !== 'string') {
       errors.push({ field: 'category', message: 'category must be a string' });
@@ -56,7 +66,7 @@ export function validateTransaction(
 export function validatePatch(
   body: Record<string, unknown>
 ): { cleaned: Record<string, unknown>; errors: ValidationError[] } {
-  const allowedFields = ['type', 'amount', 'category', 'date'];
+  const allowedFields = ['type', 'amount', 'category', 'description', 'date'];
   const cleaned: Record<string, unknown> = {};
 
   for (const key of allowedFields) {

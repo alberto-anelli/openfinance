@@ -3,6 +3,7 @@ export interface Transaction {
   type: 'expense' | 'income';
   amount: number;        // interi in CENTESIMI (>0) — evitare float
   category: string;      // libera (expense) | enum (income)
+  description?: string;  // opzionale, solo expense
   date: string;          // 'YYYY-MM-DD'
   createdAt: string;     // ISO datetime
 }

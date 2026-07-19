@@ -17,19 +17,23 @@ export default function createTransactionRouter(repo: Repository): Router {
         return;
       }
 
-      const { type, amount, category, date } = req.body as {
+      const { type, amount, category, description, date } = req.body as {
         type: 'expense' | 'income';
         amount: number;
         category: string;
+        description?: string | null;
         date: string;
       };
 
-      const cleaned = {
+      const cleaned: { type: 'expense' | 'income'; amount: number; category: string; description?: string; date: string } = {
         type,
         amount,
         category: type === 'expense' ? category.trim() : category,
         date,
       };
+      if (description && typeof description === 'string') {
+        cleaned.description = description.trim();
+      }
 
       const tx = await repo.add(cleaned);
       res.status(201).json(tx);
