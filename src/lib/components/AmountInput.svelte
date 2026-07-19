@@ -18,7 +18,7 @@
     required?: boolean;
   } = $props();
 
-  let displayValue = $state('');
+  let displayValue = $state(value > 0 ? formatInput(value) : '');
   let previousValue = value;
   let focused = $state(false);
 

@@ -17,6 +17,16 @@ export function validateTransaction(body, partial = false) {
             errors.push({ field: 'date', message: 'date must be in YYYY-MM-DD format' });
         }
     }
+    if (!partial || body.description !== undefined) {
+        if (body.description !== undefined && body.description !== null) {
+            if (typeof body.description !== 'string') {
+                errors.push({ field: 'description', message: 'description must be a string' });
+            }
+            else if (body.description.length > 200) {
+                errors.push({ field: 'description', message: 'description must be at most 200 characters' });
+            }
+        }
+    }
     if (!partial || body.category !== undefined) {
         if (typeof body.category !== 'string') {
             errors.push({ field: 'category', message: 'category must be a string' });
@@ -42,7 +52,7 @@ export function validateTransaction(body, partial = false) {
     return errors;
 }
 export function validatePatch(body) {
-    const allowedFields = ['type', 'amount', 'category', 'date'];
+    const allowedFields = ['type', 'amount', 'category', 'description', 'date'];
     const cleaned = {};
     for (const key of allowedFields) {
         if (body[key] !== undefined) {

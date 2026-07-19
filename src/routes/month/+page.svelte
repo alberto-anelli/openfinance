@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import { getBasePath } from '$lib/base';
   import { api, type Transaction, type MonthSummary, type YearSummary } from '$lib/api/client';
   import { formatCents } from '$lib/format';
@@ -19,6 +20,7 @@
   let error = $state('');
   let selectedCategory = $state<string | null>(null);
   let showYearTable = $state(false);
+  let expandedId = $state<string | null>(null);
   let toastVisible = $state(false);
   let toastMessage = $state('');
   let toastType: 'success' | 'error' = $state('success');
@@ -105,6 +107,16 @@
     toastVisible = false;
   }
 
+  function editUrl(tx: Transaction): string {
+    const base = getBasePath();
+    const route = tx.type === 'income' ? '/add-entry' : '/add-notes';
+    return `${base}${route}?id=${tx.id}`;
+  }
+
+  function toggleExpand(id: string) {
+    expandedId = expandedId === id ? null : id;
+  }
+
   const monthNames = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
@@ -165,9 +177,15 @@
         <Card
           variant={tx.type === 'income' ? 'income' : 'expense'}
           padding="sm"
+          class={expandedId === tx.id ? 'tx-expanded' : ''}
         >
           <div class="tx-row">
-            <div class="tx-info">
+            <div
+              class="tx-info"
+              class:tx-info-clickable={!!tx.description}
+              onclick={tx.description ? () => toggleExpand(tx.id) : undefined}
+              role={tx.description ? 'button' : undefined}
+            >
               <span class="tx-category">{tx.category}</span>
               <span class="tx-date text-muted">{formatDate(tx.date)}</span>
             </div>
@@ -178,6 +196,13 @@
                 {tx.type === 'income' ? '+' : '–'}{formatCents(tx.amount)}
               </span>
               <button
+                class="tx-edit"
+                onclick={() => goto(editUrl(tx))}
+                aria-label="Modifica"
+              >
+                ✎
+              </button>
+              <button
                 class="tx-delete"
                 onclick={() => deleteTransaction(tx.id)}
                 aria-label="Elimina"
@@ -186,6 +211,11 @@
               </button>
             </div>
           </div>
+          {#if expandedId === tx.id && tx.description}
+            <div class="tx-description">
+              {tx.description}
+            </div>
+          {/if}
         </Card>
       {/each}
     </div>
@@ -379,6 +409,41 @@
   .tx-delete:hover {
     color: var(--color-negative);
     background: #fef2f2;
+  }
+  .tx-edit {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    padding: 0.25rem;
+    border-radius: var(--radius-sm);
+    line-height: 1;
+    transition: color 0.15s, background 0.15s;
+  }
+  .tx-edit:hover {
+    color: var(--color-primary);
+    background: var(--blue-50);
+  }
+  .tx-info-clickable {
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    padding: 0.125rem 0;
+    transition: background 0.15s;
+  }
+  .tx-info-clickable:hover {
+    background: var(--gray-50);
+  }
+  :global(.tx-expanded) {
+    box-shadow: 0 0 0 1px var(--color-primary);
+  }
+  .tx-description {
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--color-border);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.5;
   }
 
   .empty-state {

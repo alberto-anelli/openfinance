@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { getBasePath } from '$lib/base';
   import { api } from '$lib/api/client';
   import Button from '$lib/components/Button.svelte';
@@ -19,15 +20,34 @@
   let category = $state('stipendio');
   let date = $state(today());
   let saving = $state(false);
+  let loading = $state(false);
   let error = $state('');
   let toastVisible = $state(false);
   let toastMessage = $state('');
   let toastType: 'success' | 'error' = $state('success');
 
+  const editingId = $derived(page.url.searchParams.get('id'));
+
   function today(): string {
     const d = new Date();
     return d.toISOString().split('T')[0];
   }
+
+  // Load existing transaction when editing
+  $effect(() => {
+    if (editingId) {
+      loading = true;
+      api.getById(editingId).then(tx => {
+        amount = tx.amount;
+        category = tx.category;
+        date = tx.date;
+      }).catch(err => {
+        error = err instanceof Error ? err.message : 'Errore nel caricamento';
+      }).finally(() => {
+        loading = false;
+      });
+    }
+  });
 
   function validate(): boolean {
     error = '';
@@ -42,19 +62,27 @@
 
     saving = true;
     try {
-      await api.create({
-        type: 'income',
-        amount,
-        category,
-        date,
-      });
-      toastMessage = 'Entrata aggiunta!';
-      toastType = 'success';
-      toastVisible = true;
-      // Reset form
-      amount = 0;
-      category = 'stipendio';
-      date = today();
+      if (editingId) {
+        await api.update(editingId, { amount, category, date });
+        toastMessage = 'Entrata modificata!';
+        toastType = 'success';
+        toastVisible = true;
+        setTimeout(() => goto(getBasePath() + '/month'), 1000);
+      } else {
+        await api.create({
+          type: 'income',
+          amount,
+          category,
+          date,
+        });
+        toastMessage = 'Entrata aggiunta!';
+        toastType = 'success';
+        toastVisible = true;
+        // Reset form
+        amount = 0;
+        category = 'stipendio';
+        date = today();
+      }
     } catch (err) {
       toastMessage = err instanceof Error ? err.message : 'Errore durante il salvataggio';
       toastType = 'error';
@@ -70,54 +98,58 @@
 </script>
 
 <svelte:head>
-  <title>Aggiungi entrata — Finanze</title>
+  <title>{editingId ? 'Modifica entrata' : 'Aggiungi entrata'} — Finanze</title>
 </svelte:head>
 
 <div class="page-header">
-  <h1>Aggiungi entrata</h1>
+  <h1>{editingId ? 'Modifica entrata' : 'Aggiungi entrata'}</h1>
   <Button variant="ghost" onclick={() => goto(getBasePath() + '/month')}>← Torna al mese</Button>
 </div>
 
 <Card variant="income">
-  <form onsubmit={handleSubmit}>
-    <div class="form-fields">
-      <AmountInput
-        bind:value={amount}
-        label="Importo"
-        id="amount"
-        required
-      />
+  {#if loading}
+    <p class="loading-text">Caricamento...</p>
+  {:else}
+    <form onsubmit={handleSubmit}>
+      <div class="form-fields">
+        <AmountInput
+          bind:value={amount}
+          label="Importo"
+          id="amount"
+          required
+        />
 
-      <div class="field">
-        <label for="category" class="field-label">Categoria</label>
-        <select id="category" bind:value={category} class="select">
-          {#each INCOME_CATEGORIES as cat}
-            <option value={cat.value}>{cat.label}</option>
-          {/each}
-        </select>
+        <div class="field">
+          <label for="category" class="field-label">Categoria</label>
+          <select id="category" bind:value={category} class="select">
+            {#each INCOME_CATEGORIES as cat}
+              <option value={cat.value}>{cat.label}</option>
+            {/each}
+          </select>
+        </div>
+
+        <DatePicker
+          bind:value={date}
+          label="Data"
+          id="date"
+          required
+        />
       </div>
 
-      <DatePicker
-        bind:value={date}
-        label="Data"
-        id="date"
-        required
-      />
-    </div>
+      {#if error}
+        <p class="error" role="alert">{error}</p>
+      {/if}
 
-    {#if error}
-      <p class="error" role="alert">{error}</p>
-    {/if}
-
-    <div class="form-actions">
-      <Button type="submit" disabled={saving}>
-        {saving ? 'Salvataggio...' : 'Salva entrata'}
-      </Button>
-      <Button variant="secondary" onclick={() => goto(getBasePath() + '/month')}>
-        Annulla
-      </Button>
-    </div>
-  </form>
+      <div class="form-actions">
+        <Button type="submit" disabled={saving || loading}>
+          {saving ? 'Salvataggio...' : editingId ? 'Salva modifiche' : 'Salva entrata'}
+        </Button>
+        <Button variant="secondary" onclick={() => goto(getBasePath() + '/month')}>
+          Annulla
+        </Button>
+      </div>
+    </form>
+  {/if}
 </Card>
 
 <Toast
@@ -133,6 +165,11 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: var(--space-lg);
+  }
+  .loading-text {
+    text-align: center;
+    padding: var(--space-2xl);
+    color: var(--color-text-secondary);
   }
   .form-fields {
     display: flex;

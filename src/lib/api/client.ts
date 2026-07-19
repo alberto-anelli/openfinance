@@ -9,6 +9,7 @@ export interface Transaction {
   type: 'expense' | 'income';
   amount: number; // centesimi
   category: string;
+  description?: string;
   date: string; // YYYY-MM-DD
   createdAt: string;
 }
@@ -51,7 +52,7 @@ class ApiClient {
   }
 
   // Transactions
-  create(data: { type: 'expense' | 'income'; amount: number; category: string; date: string }) {
+  create(data: { type: 'expense' | 'income'; amount: number; category: string; description?: string; date: string }) {
     return this.request<Transaction>('/transactions', {
       method: 'POST',
       body: JSON.stringify(data),

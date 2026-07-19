@@ -13,13 +13,16 @@ export default function createTransactionRouter(repo) {
                 });
                 return;
             }
-            const { type, amount, category, date } = req.body;
+            const { type, amount, category, description, date } = req.body;
             const cleaned = {
                 type,
                 amount,
                 category: type === 'expense' ? category.trim() : category,
                 date,
             };
+            if (description && typeof description === 'string') {
+                cleaned.description = description.trim();
+            }
             const tx = await repo.add(cleaned);
             res.status(201).json(tx);
         }

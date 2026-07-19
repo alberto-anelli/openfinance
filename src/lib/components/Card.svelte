@@ -1,12 +1,13 @@
 <script lang="ts">
-  let { variant = 'default', padding = 'md', children }: {
+  let { variant = 'default', padding = 'md', class: className = '', children }: {
     variant?: 'default' | 'income' | 'expense' | 'summary';
     padding?: 'sm' | 'md' | 'lg';
+    class?: string;
     children?: import('svelte').Snippet;
   } = $props();
 </script>
 
-<div class="card card-{variant} card-pad-{padding}">
+<div class="card card-{variant} card-pad-{padding} {className}">
   {@render children?.()}
 </div>
 
