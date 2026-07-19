@@ -1,0 +1,21 @@
+# SvelteKit build output
+.svelte-kit/
+
+# Frontend build output (adapter-static)
+build/
+
+# Backend compiled output
+backend/build/
+
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
