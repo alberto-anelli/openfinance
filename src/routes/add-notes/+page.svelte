@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { getBasePath } from '$lib/base';
   import { api } from '$lib/api/client';
   import Button from '$lib/components/Button.svelte';
   import AmountInput from '$lib/components/AmountInput.svelte';
@@ -78,7 +79,7 @@
 
 <div class="page-header">
   <h1>Aggiungi spesa</h1>
-  <Button variant="ghost" onclick={() => goto('/finance/month')}>← Torna al mese</Button>
+  <Button variant="ghost" onclick={() => goto(getBasePath() + '/month')}>← Torna al mese</Button>
 </div>
 
 <Card>
@@ -126,7 +127,7 @@
       <Button type="submit" disabled={saving}>
         {saving ? 'Salvataggio...' : 'Salva spesa'}
       </Button>
-      <Button variant="secondary" onclick={() => goto('/finance/month')}>
+      <Button variant="secondary" onclick={() => goto(getBasePath() + '/month')}>
         Annulla
       </Button>
     </div>

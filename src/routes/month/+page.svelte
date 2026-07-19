@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { getBasePath } from '$lib/base';
   import { api, type Transaction, type MonthSummary, type YearSummary } from '$lib/api/client';
   import { formatCents } from '$lib/format';
   import Button from '$lib/components/Button.svelte';
@@ -192,9 +193,9 @@
     <Card padding="lg">
       <p class="empty-state text-muted">
         Nessuna voce per questo mese.
-        <a href="/finance/add-notes">Aggiungi una spesa</a>
+        <a href={getBasePath() + '/add-notes'}>Aggiungi una spesa</a>
         o
-        <a href="/finance/add-entry">un'entrata</a>.
+        <a href={getBasePath() + '/add-entry'}>un'entrata</a>.
       </p>
     </Card>
   {/if}

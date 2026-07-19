@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build:app": "vite build",
+    "build:app": "vite build && node scripts/patch-app-html.mjs",
     "build": "npm run build:app && bash scripts/deploy-frontend.sh",
     "preview": "vite preview"
   },

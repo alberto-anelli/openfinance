@@ -1,14 +1,16 @@
 <script lang="ts">
   import '../lib/theme.css';
+  import { getBasePath } from '$lib/base';
+  let base = $derived(getBasePath());
   let { children }: { children?: import('svelte').Snippet } = $props();
 </script>
 
 <header class="header">
-  <a href="/finance/month" class="logo">💰 Finanze</a>
+  <a href={base + '/month'} class="logo">💰 Finanze</a>
   <nav class="nav">
-    <a href="/finance/add-notes" class="nav-link">+ Spesa</a>
-    <a href="/finance/add-entry" class="nav-link">+ Entrata</a>
-    <a href="/finance/month" class="nav-link">Mese</a>
+    <a href={base + '/add-notes'} class="nav-link">+ Spesa</a>
+    <a href={base + '/add-entry'} class="nav-link">+ Entrata</a>
+    <a href={base + '/month'} class="nav-link">Mese</a>
   </nav>
 </header>
 

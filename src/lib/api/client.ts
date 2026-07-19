@@ -1,4 +1,8 @@
-const API_BASE = import.meta.env.PUBLIC_API_BASE || '/finance/api';
+import { getBasePath } from '$lib/base';
+
+function apiBase(): string {
+	return getBasePath() + '/api';
+}
 
 export interface Transaction {
   id: string;
@@ -31,7 +35,7 @@ export interface ApiError {
 
 class ApiClient {
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
-    const url = `${API_BASE}${path}`;
+    const url = `${apiBase()}${path}`;
     const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json', ...options?.headers },
       ...options,
