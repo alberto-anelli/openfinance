@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api, type Account, type AccountBalanceLog } from '$lib/api/client';
-  import { formatCents } from '$lib/format';
+  import { formatCents, parseInput, formatInput } from '$lib/format';
   import Button from '$lib/components/Button.svelte';
+  import AmountInput from '$lib/components/AmountInput.svelte';
 
   // ── State ──────────────────────────────────────────────────────────────
   let accounts = $state<Account[]>([]);
@@ -14,6 +15,20 @@
   // Latest balance per account id
   let latestBalancesMap = $state<Map<string, number>>(new Map());
 
+  // Wealth history data
+  let wealthHistory = $state<{ date: string; netWealth: number; accountCount: number }[]>([]);
+  let wealthHistoryLoading = $state(false);
+
+  // Reconciliation data for selected account
+  let reconciliation = $state<{
+    deltas: { fromDate: string; fromBalance: number; toDate: string; toBalance: number; delta: number; daysBetween: number }[];
+    balanceLogCount: number;
+    latestBalance: number | null;
+    firstBalance: number | null;
+    totalChange: number | null;
+  } | null>(null);
+  let reconciliationLoading = $state(false);
+
   // Modal state
   let showAccountModal = $state(false);
   let editingAccount = $state<Account | null>(null);
@@ -24,7 +39,7 @@
   let formName = $state('');
   let formType = $state('');
   let formColor = $state('#6366f1');
-  let formBalance = $state('');
+  let formBalance = $state(0);
   let formDate = $state('');
   let formNote = $state('');
   let formSaving = $state(false);
@@ -103,7 +118,6 @@
       byType.set(acc.type, entry);
     }
 
-    const maxTotal = Math.max(1, ...Array.from(byType.values()).map(e => e.total));
     const result: TypeWealth[] = [];
     for (const [type, data] of byType) {
       result.push({
@@ -112,7 +126,7 @@
         icon: typeIcon(type),
         total: data.total,
         count: data.count,
-        pct: totalNetWorth > 0 ? data.total / totalNetWorth : 0,
+        pct: totalNetWorth !== 0 ? data.total / totalNetWorth : 0,
       });
     }
     result.sort((a, b) => b.total - a.total);
@@ -120,10 +134,23 @@
   });
 
   let maxTypeWealth = $derived(
-    wealthByType.length > 0 ? Math.max(...wealthByType.map(w => w.total)) : 1
+    wealthByType.length > 0 ? Math.max(...wealthByType.map(w => Math.abs(w.total))) : 1
   );
 
-  // Monthly deltas from balance logs
+  // ── Wealth history derived ─────────────────────────────────────────────
+  let wealthHistorySorted = $derived(
+    [...wealthHistory].sort((a, b) => a.date.localeCompare(b.date))
+  );
+
+  let wealthMin = $derived(
+    wealthHistorySorted.length > 0 ? Math.min(...wealthHistorySorted.map(w => w.netWealth)) : 0
+  );
+  let wealthMax = $derived(
+    wealthHistorySorted.length > 0 ? Math.max(...wealthHistorySorted.map(w => w.netWealth)) : 1
+  );
+  let wealthRange = $derived(Math.max(1, wealthMax - wealthMin));
+
+  // Monthly deltas from balance logs — FIXED: cross-month deltas included
   interface MonthDelta {
     year: number;
     month: number;
@@ -152,20 +179,17 @@
       });
       if (monthLogs.length === 0) continue;
 
-      let income = 0;
-      let outcome = 0;
-      for (let i = 1; i < monthLogs.length; i++) {
-        const delta = monthLogs[i].balance - monthLogs[i - 1].balance;
-        if (delta >= 0) income += delta;
-        else outcome += Math.abs(delta);
-      }
+      const startBalance = monthLogs[0].balance;
+      const endBalance = monthLogs[monthLogs.length - 1].balance;
+      // The delta is simply end - start (net change during the month)
+      const delta = endBalance - startBalance;
 
       deltas.push({
         year,
         month,
-        startBalance: monthLogs[0].balance,
-        endBalance: monthLogs[monthLogs.length - 1].balance,
-        delta: income - outcome,
+        startBalance,
+        endBalance,
+        delta,
       });
     }
 
@@ -177,6 +201,31 @@
       ? Math.max(1, ...monthlyDeltas.map(d => Math.abs(d.delta ?? 0)))
       : 1
   );
+
+  // ── Reconciliation derived ─────────────────────────────────────────────
+  let reconAvgDelta = $derived.by(() => {
+    if (!reconciliation || reconciliation.deltas.length === 0) return null;
+    const total = reconciliation.deltas.reduce((s, d) => s + d.delta, 0);
+    return total / reconciliation.deltas.length;
+  });
+
+  let reconAbsAvgDelta = $derived.by(() => {
+    if (!reconciliation || reconciliation.deltas.length === 0) return null;
+    const total = reconciliation.deltas.reduce((s, d) => s + Math.abs(d.delta), 0);
+    return total / reconciliation.deltas.length;
+  });
+
+  let reconMaxDelta = $derived.by(() => {
+    if (!reconciliation || reconciliation.deltas.length === 0) return null;
+    return Math.max(...reconciliation.deltas.map(d => Math.abs(d.delta)));
+  });
+
+  let reconVolatility = $derived.by(() => {
+    if (!reconciliation || reconciliation.deltas.length < 2) return null;
+    const mean = reconAvgDelta ?? 0;
+    const sqDiffs = reconciliation.deltas.map(d => (d.delta - mean) ** 2);
+    return Math.sqrt(sqDiffs.reduce((s, v) => s + v, 0) / sqDiffs.length);
+  });
 
   // ── Data loading ───────────────────────────────────────────────────────
   async function loadAccounts() {
@@ -204,6 +253,9 @@
         if (selectedAccountId) await loadBalances(selectedAccountId);
         else balances = [];
       }
+
+      // Load wealth history
+      loadWealthHistory();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Errore nel caricamento';
     } finally {
@@ -214,8 +266,33 @@
   async function loadBalances(accountId: string) {
     try {
       balances = await api.listBalances(accountId);
+      // Also load reconciliation for this account
+      loadReconciliation(accountId);
     } catch {
       balances = [];
+    }
+  }
+
+  async function loadWealthHistory() {
+    wealthHistoryLoading = true;
+    try {
+      wealthHistory = await api.wealthHistory();
+    } catch {
+      // non-critical
+    } finally {
+      wealthHistoryLoading = false;
+    }
+  }
+
+  async function loadReconciliation(accountId: string) {
+    reconciliationLoading = true;
+    try {
+      const result = await api.accountReconciliation(accountId);
+      reconciliation = result;
+    } catch {
+      reconciliation = null;
+    } finally {
+      reconciliationLoading = false;
     }
   }
 
@@ -294,7 +371,7 @@
   function openAddBalance() {
     if (!selectedAccount) return;
     editingBalance = null;
-    formBalance = '';
+    formBalance = 0;
     formDate = new Date().toISOString().split('T')[0];
     formNote = '';
     showBalanceModal = true;
@@ -302,28 +379,26 @@
 
   function openEditBalance(log: AccountBalanceLog) {
     editingBalance = log;
-    formBalance = String(log.balance);
+    formBalance = log.balance;
     formDate = log.date;
     formNote = log.note ?? '';
     showBalanceModal = true;
   }
 
   async function saveBalance() {
-    if (!formDate || !formBalance.trim() || !selectedAccount) return;
-    const balanceNum = parseInt(formBalance.replace(/[^0-9-]/g, ''), 10);
-    if (isNaN(balanceNum)) return;
+    if (!formDate || !selectedAccount) return;
 
     formSaving = true;
     try {
       if (editingBalance) {
         await api.updateBalance(editingBalance.id, {
-          balance: balanceNum,
+          balance: formBalance,
           date: formDate,
           note: formNote.trim() || undefined,
         });
       } else {
         await api.createBalance(selectedAccount.id, {
-          balance: balanceNum,
+          balance: formBalance,
           date: formDate,
           note: formNote.trim() || undefined,
         });
@@ -338,6 +413,8 @@
         newMap.set(selectedAccount.id, latest.balance);
         latestBalancesMap = newMap;
       }
+      await loadReconciliation(selectedAccount.id);
+      await loadWealthHistory();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Errore');
     } finally {
@@ -361,6 +438,8 @@
           newMap.delete(selectedAccountId);
         }
         latestBalancesMap = newMap;
+        await loadReconciliation(selectedAccountId);
+        await loadWealthHistory();
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Errore');
@@ -371,6 +450,11 @@
   const CHART_W = 600;
   const CHART_H = 200;
   const CHART_PAD = 8;
+
+  // Wealth history chart dimensions
+  const WH_CHART_W = 600;
+  const WH_CHART_H = 150;
+  const WH_CHART_PAD = 6;
 
   function balanceLinePath(): string | null {
     if (sortedBalances.length < 2) return null;
@@ -408,10 +492,39 @@
   let balRange = $derived(Math.max(1, maxBal - minBal));
   let balStepX = $derived((CHART_W - CHART_PAD * 2) / Math.max(1, sortedBalances.length - 1));
 
+  let whStepXAcc = $derived((WH_CHART_W - WH_CHART_PAD * 2) / Math.max(1, wealthHistorySorted.length - 1));
+
   function formatEuroShort(c: number): string {
     const eur = c / 100;
     if (Math.abs(eur) >= 1000) return (eur / 1000).toFixed(1) + 'k';
     return eur.toFixed(0) + '€';
+  }
+
+  // Wealth history SVG path helpers
+  function whAreaPathAcc(): string {
+    if (wealthHistorySorted.length < 2) return '';
+    const stepX = (WH_CHART_W - WH_CHART_PAD * 2) / Math.max(1, wealthHistorySorted.length - 1);
+    let d = `M${WH_CHART_PAD},${WH_CHART_H - WH_CHART_PAD}`;
+    for (let i = 0; i < wealthHistorySorted.length; i++) {
+      const x = WH_CHART_PAD + i * stepX;
+      const y = WH_CHART_PAD + ((wealthMax - wealthHistorySorted[i].netWealth) / wealthRange) * (WH_CHART_H - WH_CHART_PAD * 2);
+      d += `L${x},${y}`;
+    }
+    const lastX = WH_CHART_PAD + (wealthHistorySorted.length - 1) * stepX;
+    d += `L${lastX},${WH_CHART_H - WH_CHART_PAD}Z`;
+    return d;
+  }
+
+  function whLinePathAcc(): string {
+    if (wealthHistorySorted.length < 2) return '';
+    const stepX = (WH_CHART_W - WH_CHART_PAD * 2) / Math.max(1, wealthHistorySorted.length - 1);
+    let d = '';
+    for (let i = 0; i < wealthHistorySorted.length; i++) {
+      const x = WH_CHART_PAD + i * stepX;
+      const y = WH_CHART_PAD + ((wealthMax - wealthHistorySorted[i].netWealth) / wealthRange) * (WH_CHART_H - WH_CHART_PAD * 2);
+      d += i === 0 ? `M${x},${y}` : `L${x},${y}`;
+    }
+    return d;
   }
 
   </script>
@@ -466,7 +579,7 @@
           {#each wealthByType as w}
             <div
               class="wealth-bar-segment"
-              style="width: {w.pct * 100}%; background: {typeColor(w.type)}"
+              style="width: {Math.abs(w.pct) * 100}%; background: {typeColor(w.type)}"
               title="{w.label}: {formatCents(w.total)}"
             ></div>
           {/each}
@@ -484,10 +597,36 @@
                 ></div>
               </div>
               <span class="wealth-type-amount">{formatCents(w.total)}</span>
-              <span class="wealth-type-pct">{(w.pct * 100).toFixed(1)}%</span>
+              <span class="wealth-type-pct">{(Math.abs(w.pct) * 100).toFixed(1)}%</span>
             </div>
           {/each}
         </div>
+      </div>
+    {/if}
+
+    {#if wealthHistorySorted.length >= 2}
+      <div class="wealth-chart-section">
+        <h3 class="wealth-title">Evoluzione Patrimonio Netto</h3>
+        <svg viewBox="0 0 {WH_CHART_W} {WH_CHART_H + 20}" class="line-chart">
+          <defs>
+            <linearGradient id="whAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--color-primary)40" />
+              <stop offset="100%" stop-color="var(--color-primary)05" />
+            </linearGradient>
+          </defs>
+          <!-- Area -->
+          <path d={whAreaPathAcc()} fill="url(#whAreaGrad)" />
+          <!-- Line -->
+          <path d={whLinePathAcc()} fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <!-- Dots -->
+          {#each wealthHistorySorted as w, i}
+            {@const x = WH_CHART_PAD + i * whStepXAcc}
+            {@const y = WH_CHART_PAD + ((wealthMax - w.netWealth) / wealthRange) * (WH_CHART_H - WH_CHART_PAD * 2)}
+            <circle cx={x} cy={y} r="3" fill="var(--color-primary)" stroke="#fff" stroke-width="1.5">
+              <title>{new Date(w.date + 'T00:00:00').toLocaleDateString('it-IT')}: {formatCents(w.netWealth)}</title>
+            </circle>
+          {/each}
+        </svg>
       </div>
     {/if}
   </div>
@@ -595,6 +734,77 @@
         </div>
       {/if}
 
+      <!-- ── Reconciliation statistics ───────────────────────────────── -->
+      {#if reconciliation && reconciliation.deltas.length > 0}
+        <div class="chart-card">
+          <h3 class="section-title">Analisi Saldo</h3>
+          <div class="recon-stats-grid">
+            <div class="recon-stat">
+              <span class="recon-stat-label">Saldo Iniziale</span>
+              <span class="recon-stat-value">{formatCents(reconciliation.firstBalance!)}</span>
+            </div>
+            <div class="recon-stat">
+              <span class="recon-stat-label">Saldo Attuale</span>
+              <span class="recon-stat-value">{formatCents(reconciliation.latestBalance!)}</span>
+            </div>
+            <div class="recon-stat">
+              <span class="recon-stat-label">Variazione Totale</span>
+              <span class="recon-stat-value {reconciliation.totalChange! >= 0 ? 'text-positive' : 'text-negative'}">
+                {formatCents(reconciliation.totalChange!)}
+              </span>
+            </div>
+            <div class="recon-stat">
+              <span class="recon-stat-label">Registrazioni</span>
+              <span class="recon-stat-value">{reconciliation.balanceLogCount}</span>
+            </div>
+            <div class="recon-stat">
+              <span class="recon-stat-label">Delta Medio</span>
+              <span class="recon-stat-value text-muted">{reconAvgDelta !== null ? formatCents(Math.round(reconAvgDelta)) : '—'}</span>
+            </div>
+            <div class="recon-stat">
+              <span class="recon-stat-label">Delta Medio (ass.)</span>
+              <span class="recon-stat-value text-muted">{reconAbsAvgDelta !== null ? formatCents(Math.round(reconAbsAvgDelta)) : '—'}</span>
+            </div>
+            <div class="recon-stat">
+              <span class="recon-stat-label">Delta Massimo</span>
+              <span class="recon-stat-value">{reconMaxDelta !== null ? formatCents(reconMaxDelta) : '—'}</span>
+            </div>
+            <div class="recon-stat">
+              <span class="recon-stat-label">Volatilità</span>
+              <span class="recon-stat-value text-muted">{reconVolatility !== null ? formatCents(Math.round(reconVolatility)) : '—'}</span>
+            </div>
+          </div>
+          <div class="recon-delta-table">
+            <div class="recon-delta-table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Da</th>
+                    <th>A</th>
+                    <th>Giorni</th>
+                    <th>Variazione</th>
+                    <th>Giornaliero</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each reconciliation.deltas as d}
+                    <tr>
+                      <td>{new Date(d.fromDate + 'T00:00:00').toLocaleDateString('it-IT')}</td>
+                      <td>{new Date(d.toDate + 'T00:00:00').toLocaleDateString('it-IT')}</td>
+                      <td class="recon-td-num">{d.daysBetween}</td>
+                      <td class="recon-td-num {d.delta >= 0 ? 'text-positive' : 'text-negative'}">{formatCents(d.delta)}</td>
+                      <td class="recon-td-num text-muted">
+                        {d.daysBetween > 0 ? formatCents(Math.round(d.delta / d.daysBetween)) : '—'}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      {/if}
+
       <div class="log-table-card">
         <div class="log-table-header">
           <h3 class="section-title">Registrazioni Saldo</h3>
@@ -698,10 +908,10 @@
         <input type="date" class="field-input" bind:value={formDate} />
       </label>
 
-      <label class="field">
-        <span class="field-label">Saldo (centesimi)</span>
-        <input type="text" class="field-input" bind:value={formBalance} placeholder="es. 150000 = €1500,00" />
-      </label>
+      <div class="field">
+        <span class="field-label">Saldo</span>
+        <AmountInput bind:value={formBalance} />
+      </div>
 
       <label class="field">
         <span class="field-label">Nota (opzionale)</span>
@@ -710,7 +920,7 @@
 
       <div class="modal-actions">
         <Button variant="ghost" onclick={() => showBalanceModal = false}>Annulla</Button>
-        <Button onclick={saveBalance} disabled={!formDate || !formBalance.trim() || formSaving}>
+        <Button onclick={saveBalance} disabled={!formDate || formSaving}>
           {formSaving ? 'Salvataggio...' : editingBalance ? 'Salva' : 'Registra'}
         </Button>
       </div>
@@ -944,6 +1154,66 @@
   .color-swatch-active { border-color: var(--color-text); }
   .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-sm); }
 
+  /* ── Wealth chart section ──────────────────────────────────────────────────── */
+  .wealth-chart-section {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--slate-100);
+  }
+
+  /* ── Reconciliation statistics ─────────────────────────────────────────────── */
+  .recon-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+  }
+  .recon-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+  .recon-stat-label {
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .recon-stat-value {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: var(--text-sm);
+  }
+  .recon-delta-table {
+    font-size: var(--text-sm);
+  }
+  .recon-delta-table-scroll {
+    overflow-x: auto;
+  }
+  .recon-delta-table table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .recon-delta-table th {
+    text-align: left;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.375rem 0.5rem;
+    border-bottom: 2px solid var(--slate-200);
+  }
+  .recon-delta-table td {
+    padding: 0.375rem 0.5rem;
+    border-bottom: 1px solid var(--slate-100);
+    font-family: var(--font-mono);
+  }
+  .recon-td-num {
+    text-align: right;
+  }
+
   /* ── Responsive ─────────────────────────────────────────────────────────── */
   @media (max-width: 640px) {
     .accounts-grid { grid-template-columns: 1fr 1fr; }
@@ -953,5 +1223,6 @@
     .wealth-type-row { grid-template-columns: 1.5rem 1fr 2rem 5rem; }
     .wealth-type-bar-track { display: none; }
     .wealth-type-pct { display: none; }
+    .recon-stats-grid { grid-template-columns: repeat(2, 1fr); }
   }
 </style>

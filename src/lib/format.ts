@@ -27,11 +27,13 @@ export function formatInput(centesimi: number): string {
 /**
  * Parse a user-typed string (e.g. `"1,00"` or `"1.00"`) to centesimi.
  * Accepts both `,` and `.` as decimal separator.
+ * Supports negative values (e.g. `"-1,00"` → `-100`).
  * Example: `parseInput("1,00")` → `100`
  */
 export function parseInput(str: string): number {
-  const normalized = str.replace(',', '.');
+  const normalized = str.replace(',', '.').trim();
+  if (normalized === '' || normalized === '-') return 0;
   const euros = parseFloat(normalized);
-  if (isNaN(euros) || euros < 0) return 0;
+  if (isNaN(euros)) return 0;
   return Math.round(euros * 100);
 }

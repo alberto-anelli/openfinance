@@ -166,6 +166,22 @@ class ApiClient {
     return this.request<AccountWithBalance[]>('/accounts/wealth');
   }
 
+  wealthHistory() {
+    return this.request<{ date: string; netWealth: number; accountCount: number }[]>('/accounts/wealth/history');
+  }
+
+  accountReconciliation(id: string) {
+    return this.request<{
+      account: Account;
+      balanceLogs: AccountBalanceLog[];
+      deltas: { fromDate: string; fromBalance: number; toDate: string; toBalance: number; delta: number; daysBetween: number }[];
+      balanceLogCount: number;
+      latestBalance: number | null;
+      firstBalance: number | null;
+      totalChange: number | null;
+    }>(`/accounts/reconciliation/${id}`);
+  }
+
   // ── Balance logs ───────────────────────────────────────────────────────
   listBalances(accountId: string) {
     return this.request<AccountBalanceLog[]>(`/accounts/${accountId}/balances`);

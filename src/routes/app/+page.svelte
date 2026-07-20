@@ -21,6 +21,8 @@
   let wealthAccounts = $state<AccountWithBalance[]>([]);
   let wealthLoading = $state(false);
   let allAccounts = $state<Account[]>([]);
+  let wealthHistory = $state<{ date: string; netWealth: number; accountCount: number }[]>([]);
+  let wealthHistoryLoading = $state(false);
 
   let totalNetWorth = $derived(
     wealthAccounts.reduce((sum, a) => sum + (a.latestBalance ?? 0), 0)
@@ -35,18 +37,30 @@
       entry.count++;
       byType.set(acc.type, entry);
     }
-    const maxTotal = Math.max(1, ...Array.from(byType.values()).map(e => e.total));
     const result: { type: string; total: number; count: number; pct: number }[] = [];
     for (const [type, data] of byType) {
-      result.push({ type, total: data.total, count: data.count, pct: totalNetWorth > 0 ? data.total / totalNetWorth : 0 });
+      result.push({ type, total: data.total, count: data.count, pct: totalNetWorth !== 0 ? data.total / totalNetWorth : 0 });
     }
     result.sort((a, b) => b.total - a.total);
     return result;
   });
 
   let maxTypeWealth = $derived(
-    wealthByType.length > 0 ? Math.max(...wealthByType.map(w => w.total)) : 1
+    wealthByType.length > 0 ? Math.max(...wealthByType.map(w => Math.abs(w.total))) : 1
   );
+
+  let wealthHistorySorted = $derived(
+    [...wealthHistory].sort((a, b) => a.date.localeCompare(b.date))
+  );
+
+  let wealthHistMin = $derived(
+    wealthHistorySorted.length > 0 ? Math.min(...wealthHistorySorted.map(w => w.netWealth)) : 0
+  );
+  let wealthHistMax = $derived(
+    wealthHistorySorted.length > 0 ? Math.max(...wealthHistorySorted.map(w => w.netWealth)) : 1
+  );
+  let wealthHistRange = $derived(Math.max(1, wealthHistMax - wealthHistMin));
+  let whStepX = $derived((WH_W - WH_PAD * 2) / Math.max(1, wealthHistorySorted.length - 1));
 
   const monthNames = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -244,12 +258,14 @@
   async function loadWealth() {
     wealthLoading = true;
     try {
-      const [wealth, accs] = await Promise.all([
+      const [wealth, accs, wh] = await Promise.all([
         api.wealth(),
         api.listAccounts(),
+        api.wealthHistory(),
       ]);
       wealthAccounts = wealth;
       allAccounts = accs;
+      wealthHistory = wh;
     } catch {
       // silently fail — wealth is supplementary
     } finally {
@@ -263,6 +279,11 @@
   const CHART_H = 200;
   const CHART_PAD = 4;
 
+  // Wealth history chart dimensions
+  const WH_W = 600;
+  const WH_H = 180;
+  const WH_PAD = 6;
+
   function barHeight(val: number, max: number): number {
     if (max === 0) return 0;
     return Math.max(4, (val / max) * (CHART_H - CHART_PAD * 2));
@@ -272,6 +293,33 @@
     const eur = c / 100;
     if (eur >= 1000) return (eur / 1000).toFixed(1) + 'k';
     return eur.toFixed(0) + '€';
+  }
+
+  // Wealth history SVG path helpers
+  function whAreaPath(): string {
+    if (wealthHistorySorted.length < 2) return '';
+    const stepX = (WH_W - WH_PAD * 2) / Math.max(1, wealthHistorySorted.length - 1);
+    let d = `M${WH_PAD},${WH_H - WH_PAD}`;
+    for (let i = 0; i < wealthHistorySorted.length; i++) {
+      const x = WH_PAD + i * stepX;
+      const y = WH_PAD + ((wealthHistMax - wealthHistorySorted[i].netWealth) / wealthHistRange) * (WH_H - WH_PAD * 2);
+      d += `L${x},${y}`;
+    }
+    const lastX = WH_PAD + (wealthHistorySorted.length - 1) * stepX;
+    d += `L${lastX},${WH_H - WH_PAD}Z`;
+    return d;
+  }
+
+  function whLinePath(): string {
+    if (wealthHistorySorted.length < 2) return '';
+    const stepX = (WH_W - WH_PAD * 2) / Math.max(1, wealthHistorySorted.length - 1);
+    let d = '';
+    for (let i = 0; i < wealthHistorySorted.length; i++) {
+      const x = WH_PAD + i * stepX;
+      const y = WH_PAD + ((wealthHistMax - wealthHistorySorted[i].netWealth) / wealthHistRange) * (WH_H - WH_PAD * 2);
+      d += i === 0 ? `M${x},${y}` : `L${x},${y}`;
+    }
+    return d;
   }
 </script>
 
@@ -392,7 +440,7 @@
             {#each wealthByType as w}
               <div
                 class="wealth-bar-segment"
-                style="width: {w.pct * 100}%"
+                style="width: {Math.abs(w.pct) * 100}%"
                 title="{w.type}: {formatCents(w.total)}"
               ></div>
             {/each}
@@ -407,14 +455,48 @@
               <div class="wealth-type-bar-track">
                 <div
                   class="wealth-type-bar-fill"
-                  style="width: {(w.total / maxTypeWealth) * 100}%"
+                  style="width: {(Math.abs(w.total) / maxTypeWealth) * 100}%"
                 ></div>
               </div>
               <span class="wealth-type-amount">{formatCents(w.total)}</span>
-              <span class="wealth-type-pct">{(w.pct * 100).toFixed(1)}%</span>
+              <span class="wealth-type-pct">{(Math.abs(w.pct) * 100).toFixed(1)}%</span>
             </div>
           {/each}
         </div>
+      </div>
+    {/if}
+
+    <!-- Wealth trend chart -->
+    {#if wealthHistorySorted.length >= 2}
+      <div class="chart-card">
+        <div class="chart-header">
+          <h3 class="section-title">Andamento Patrimonio Netto</h3>
+          <span class="section-badge">{wealthHistorySorted.length} punti</span>
+        </div>
+        <svg viewBox="0 0 {WH_W} {WH_H + 24}" class="wealth-trend-chart">
+          <defs>
+            <linearGradient id="ovWhAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--color-positive)40" />
+              <stop offset="100%" stop-color="var(--color-positive)05" />
+            </linearGradient>
+          </defs>
+          <!-- Grid lines -->
+          <line x1={WH_PAD} y1={WH_PAD} x2={WH_W - WH_PAD} y2={WH_PAD} stroke="var(--color-border)" stroke-width="1" stroke-dasharray="4 4" />
+          <line x1={WH_PAD} y1={WH_H / 2} x2={WH_W - WH_PAD} y2={WH_H / 2} stroke="var(--color-border)" stroke-width="1" stroke-dasharray="4 4" />
+          <line x1={WH_PAD} y1={WH_H - WH_PAD} x2={WH_W - WH_PAD} y2={WH_H - WH_PAD} stroke="var(--color-border)" stroke-width="1" />
+          <!-- Area -->
+          <path d={whAreaPath()} fill="url(#ovWhAreaGrad)" />
+          <!-- Line -->
+          <path d={whLinePath()} fill="none" stroke="var(--color-positive)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <!-- Dots -->
+          {#each wealthHistorySorted as w, i}
+            {@const x = WH_PAD + i * whStepX}
+            {@const y = WH_PAD + ((wealthHistMax - w.netWealth) / wealthHistRange) * (WH_H - WH_PAD * 2)}
+            <circle cx={x} cy={y} r="3" fill="var(--color-positive)" stroke="#fff" stroke-width="1.5">
+              <title>{new Date(w.date + 'T00:00:00').toLocaleDateString('it-IT')}: {formatCents(w.netWealth)}</title>
+            </circle>
+          {/each}
+        </svg>
       </div>
     {/if}
 
@@ -1017,6 +1099,12 @@
     color: var(--color-text-secondary);
     font-style: italic;
     text-align: center;
+  }
+
+  .wealth-trend-chart {
+    width: 100%;
+    height: 204px;
+    display: block;
   }
 
   /* ── Empty state ────────────────────────────────────────────────────────── */
