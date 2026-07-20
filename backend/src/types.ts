@@ -36,3 +36,33 @@ export interface ApiError {
     message: string;
   };
 }
+
+// ── Account types ────────────────────────────────────────────────────────
+
+export type AccountType = 'bank' | 'credit_card' | 'debit_card' | 'savings' | 'cash' | 'other';
+
+export interface Account {
+  id: string;
+  name: string;
+  type: AccountType;
+  currency: string;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccountBalanceLog {
+  id: string;
+  accountId: string;
+  balance: number;    // centesimi
+  date: string;       // YYYY-MM-DD
+  note?: string;
+  createdAt: string;
+}
+
+export interface AccountDumpFile {
+  schemaVersion: number;
+  savedAt: string;
+  accounts: Account[];
+  balanceLogs: AccountBalanceLog[];
+}

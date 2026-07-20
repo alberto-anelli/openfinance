@@ -34,6 +34,29 @@ export interface ApiError {
   error: { code: string; message: string };
 }
 
+// ── Account types ────────────────────────────────────────────────────────
+
+export type AccountType = 'bank' | 'credit_card' | 'debit_card' | 'savings' | 'cash' | 'other';
+
+export interface Account {
+  id: string;
+  name: string;
+  type: AccountType;
+  currency: string;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccountBalanceLog {
+  id: string;
+  accountId: string;
+  balance: number;    // centesimi
+  date: string;       // YYYY-MM-DD
+  note?: string;
+  createdAt: string;
+}
+
 class ApiClient {
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const url = `${apiBase()}${path}`;
@@ -98,6 +121,56 @@ class ApiClient {
     const txs = await this.list({ type: 'expense' });
     const cats = new Set(txs.map(tx => tx.category));
     return Array.from(cats).sort();
+  }
+
+  // ── Accounts ───────────────────────────────────────────────────────────
+  listAccounts() {
+    return this.request<Account[]>('/accounts');
+  }
+
+  createAccount(data: { name: string; type: AccountType; currency?: string; color?: string }) {
+    return this.request<Account>('/accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  getAccount(id: string) {
+    return this.request<Account>(`/accounts/${id}`);
+  }
+
+  updateAccount(id: string, patch: Partial<Account>) {
+    return this.request<Account>(`/accounts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    });
+  }
+
+  deleteAccount(id: string) {
+    return this.request<void>(`/accounts/${id}`, { method: 'DELETE' });
+  }
+
+  // ── Balance logs ───────────────────────────────────────────────────────
+  listBalances(accountId: string) {
+    return this.request<AccountBalanceLog[]>(`/accounts/${accountId}/balances`);
+  }
+
+  createBalance(accountId: string, data: { balance: number; date: string; note?: string }) {
+    return this.request<AccountBalanceLog>(`/accounts/${accountId}/balances`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  updateBalance(id: string, patch: Partial<AccountBalanceLog>) {
+    return this.request<AccountBalanceLog>(`/balances/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    });
+  }
+
+  deleteBalance(id: string) {
+    return this.request<void>(`/balances/${id}`, { method: 'DELETE' });
   }
 }
 

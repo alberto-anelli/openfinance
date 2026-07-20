@@ -2,8 +2,10 @@ import express from 'express';
 import { mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { InMemoryRepository } from './InMemoryRepository.js';
+import { AccountRepository } from './AccountRepository.js';
 import createTransactionRouter from './routes/transactions.js';
 import createSummaryRouter from './routes/summary.js';
+import createAccountRouter from './routes/accounts.js';
 import healthRouter from './routes/health.js';
 
 const PORT = parseInt(process.env.FINANCE_PORT || '3900', 10);
@@ -18,13 +20,16 @@ async function main() {
     console.log(`Created data directory: ${DATA_DIR}`);
   }
 
-  // Initialize repository
+  // Initialize repositories
   const repo = new InMemoryRepository({
     dataDir: DATA_DIR,
     dumpIntervalMs: DUMP_INTERVAL_MS,
     dumpKeep: DUMP_KEEP,
   });
   await repo.init();
+
+  const accountRepo = new AccountRepository({ dataDir: DATA_DIR });
+  await accountRepo.init();
 
   // Create Express app
   const app = express();
@@ -35,6 +40,7 @@ async function main() {
   // API routes
   app.use('/api', createTransactionRouter(repo));
   app.use('/api', createSummaryRouter(repo));
+  app.use('/api', createAccountRouter(accountRepo));
   app.use('/api', healthRouter);
 
   // Start server

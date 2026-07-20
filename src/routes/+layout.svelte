@@ -32,7 +32,7 @@
       </svg>
       Entrata
     </a>
-    <a href={base + '/app'} class="nav-link" class:nav-link-active={activeRoute.includes('/app')}>
+    <a href={base + '/app'} class="nav-link" class:nav-link-active={activeRoute === base + '/app'}>
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" class="nav-icon">
         <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" />
         <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" />
@@ -40,6 +40,15 @@
         <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" />
       </svg>
       Panoramica
+    </a>
+    <a href={base + '/app/account'} class="nav-link" class:nav-link-active={activeRoute.includes('/app/account')}>
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" class="nav-icon">
+        <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" />
+        <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" />
+        <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" />
+        <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5" />
+      </svg>
+      Conti
     </a>
     <a href={base + '/month'} class="nav-link" class:nav-link-active={activeRoute.includes('/month')}>
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" class="nav-icon">
