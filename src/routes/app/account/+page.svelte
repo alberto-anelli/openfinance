@@ -11,6 +11,9 @@
   let loading = $state(true);
   let error = $state('');
 
+  // Latest balance per account id
+  let latestBalancesMap = $state<Map<string, number>>(new Map());
+
   // Modal state
   let showAccountModal = $state(false);
   let editingAccount = $state<Account | null>(null);
@@ -33,9 +36,79 @@
 
   let currentBalance = $derived.by(() => {
     if (balances.length === 0) return null;
-    // Most recent balance by date
     return balances.reduce((latest, b) => b.date > latest.date ? b : latest);
   });
+
+  // ── Wealth statistics ──────────────────────────────────────────────────
+  interface TypeWealth {
+    type: AccountType;
+    label: string;
+    icon: string;
+    total: number;
+    count: number;
+    pct: number;
+  }
+
+  const accountTypeLabels: Record<AccountType, string> = {
+    bank: 'Conto Corrente',
+    credit_card: 'Carta di Credito',
+    debit_card: 'Carta di Debito',
+    savings: 'Conto Risparmio',
+    cash: 'Contanti',
+    other: 'Altro',
+  };
+
+  const accountTypeIcons: Record<AccountType, string> = {
+    bank: '🏦',
+    credit_card: '💳',
+    debit_card: '💳',
+    savings: '🐷',
+    cash: '💵',
+    other: '📦',
+  };
+
+  const accountTypeColors: Record<AccountType, string> = {
+    bank: '#2563eb',
+    credit_card: '#f97316',
+    debit_card: '#14b8a6',
+    savings: '#16a34a',
+    cash: '#8b5cf6',
+    other: '#6b7280',
+  };
+
+  let totalNetWorth = $derived(
+    Array.from(latestBalancesMap.values()).reduce((sum, b) => sum + b, 0)
+  );
+
+  let wealthByType = $derived.by(() => {
+    const byType = new Map<AccountType, { total: number; count: number }>();
+    for (const acc of accounts) {
+      const bal = latestBalancesMap.get(acc.id) ?? 0;
+      const entry = byType.get(acc.type) ?? { total: 0, count: 0 };
+      entry.total += bal;
+      entry.count++;
+      byType.set(acc.type, entry);
+    }
+
+    const maxTotal = Math.max(1, ...Array.from(byType.values()).map(e => e.total));
+    const result: TypeWealth[] = [];
+    for (const [type, data] of byType) {
+      result.push({
+        type,
+        label: accountTypeLabels[type],
+        icon: accountTypeIcons[type],
+        total: data.total,
+        count: data.count,
+        pct: totalNetWorth > 0 ? data.total / totalNetWorth : 0,
+      });
+    }
+    result.sort((a, b) => b.total - a.total);
+    return result;
+  });
+
+  let maxTypeWealth = $derived(
+    wealthByType.length > 0 ? Math.max(...wealthByType.map(w => w.total)) : 1
+  );
 
   // Monthly deltas from balance logs
   interface MonthDelta {
@@ -66,7 +139,6 @@
       });
       if (monthLogs.length === 0) continue;
 
-      // Income/outcome = sum of positive/negative deltas between consecutive logs
       let income = 0;
       let outcome = 0;
       for (let i = 1; i < monthLogs.length; i++) {
@@ -93,32 +165,25 @@
       : 1
   );
 
-  // ── Account type helpers ───────────────────────────────────────────────
-  const accountTypeLabels: Record<AccountType, string> = {
-    bank: 'Conto Corrente',
-    credit_card: 'Carta di Credito',
-    debit_card: 'Carta di Debito',
-    savings: 'Conto Risparmio',
-    cash: 'Contanti',
-    other: 'Altro',
-  };
-
-  const accountTypeIcons: Record<AccountType, string> = {
-    bank: '🏦',
-    credit_card: '💳',
-    debit_card: '💳',
-    savings: '🐷',
-    cash: '💵',
-    other: '📦',
-  };
-
   // ── Data loading ───────────────────────────────────────────────────────
   async function loadAccounts() {
     loading = true;
     error = '';
     try {
       accounts = await api.listAccounts();
-      // If selected account still exists, reload its balances
+      // Load latest balance for every account
+      const latestMap = new Map<string, number>();
+      await Promise.all(accounts.map(async (acc) => {
+        try {
+          const accBalances = await api.listBalances(acc.id);
+          if (accBalances.length > 0) {
+            const latest = accBalances.reduce((a, b) => a.date > b.date ? a : b);
+            latestMap.set(acc.id, latest.balance);
+          }
+        } catch { /* skip */ }
+      }));
+      latestBalancesMap = latestMap;
+
       if (selectedAccountId && accounts.some(a => a.id === selectedAccountId)) {
         await loadBalances(selectedAccountId);
       } else {
@@ -245,6 +310,14 @@
       }
       showBalanceModal = false;
       await loadBalances(selectedAccount.id);
+      // Refresh latest balances map
+      const updatedBalances = await api.listBalances(selectedAccount.id);
+      if (updatedBalances.length > 0) {
+        const latest = updatedBalances.reduce((a, b) => a.date > b.date ? a : b);
+        const newMap = new Map(latestBalancesMap);
+        newMap.set(selectedAccount.id, latest.balance);
+        latestBalancesMap = newMap;
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Errore');
     } finally {
@@ -256,7 +329,19 @@
     if (!confirm('Eliminare questa registrazione di saldo?')) return;
     try {
       await api.deleteBalance(id);
-      if (selectedAccountId) await loadBalances(selectedAccountId);
+      if (selectedAccountId) {
+        await loadBalances(selectedAccountId);
+        // Refresh latest balances map
+        const updatedBalances = await api.listBalances(selectedAccountId);
+        const newMap = new Map(latestBalancesMap);
+        if (updatedBalances.length > 0) {
+          const latest = updatedBalances.reduce((a, b) => a.date > b.date ? a : b);
+          newMap.set(selectedAccountId, latest.balance);
+        } else {
+          newMap.delete(selectedAccountId);
+        }
+        latestBalancesMap = newMap;
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Errore');
     }
@@ -288,15 +373,9 @@
       const y = CHART_PAD + ((maxBal - sortedBalances[i].balance) / balRange) * (CHART_H - CHART_PAD * 2);
       d += i === 0 ? `M${x},${y}` : `L${x},${y}`;
     }
-    // Close the area
     const lastX = CHART_PAD + (sortedBalances.length - 1) * stepX;
     d += `L${lastX},${CHART_H - CHART_PAD}L${CHART_PAD},${CHART_H - CHART_PAD}Z`;
     return d;
-  }
-
-  function formatShortDate(dateStr: string): string {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short' });
   }
 
   const monthNamesShort = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic'];
@@ -314,6 +393,8 @@
     if (Math.abs(eur) >= 1000) return (eur / 1000).toFixed(1) + 'k';
     return eur.toFixed(0) + '€';
   }
+
+  const ACCOUNT_TYPE_ENTRIES = Object.entries(accountTypeLabels) as [AccountType, string][];
 </script>
 
 <svelte:head>
@@ -347,6 +428,51 @@
   </div>
 {:else}
 
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <!-- WEALTH OVERVIEW — aggregate statistics across all accounts          -->
+  <!-- ════════════════════════════════════════════════════════════════════ -->
+  <div class="wealth-section">
+    <div class="wealth-hero">
+      <span class="wealth-hero-label">Patrimonio Netto</span>
+      <span class="wealth-hero-amount {totalNetWorth >= 0 ? 'text-positive' : 'text-negative'}">
+        {formatCents(totalNetWorth)}
+      </span>
+      <span class="wealth-hero-sub text-muted">{accounts.length} conti</span>
+    </div>
+
+    {#if wealthByType.length > 0}
+      <div class="wealth-breakdown">
+        <h3 class="wealth-title">Suddivisione per Tipo</h3>
+        <div class="wealth-stacked-bar">
+          {#each wealthByType as w}
+            <div
+              class="wealth-bar-segment"
+              style="width: {w.pct * 100}%; background: {accountTypeColors[w.type]}"
+              title="{w.label}: {formatCents(w.total)}"
+            ></div>
+          {/each}
+        </div>
+        <div class="wealth-type-list">
+          {#each wealthByType as w}
+            <div class="wealth-type-row">
+              <span class="wealth-type-icon">{w.icon}</span>
+              <span class="wealth-type-label">{w.label}</span>
+              <span class="wealth-type-count">{w.count}</span>
+              <div class="wealth-type-bar-track">
+                <div
+                  class="wealth-type-bar-fill"
+                  style="width: {(w.total / maxTypeWealth) * 100}%; background: {accountTypeColors[w.type]}"
+                ></div>
+              </div>
+              <span class="wealth-type-amount">{formatCents(w.total)}</span>
+              <span class="wealth-type-pct">{(w.pct * 100).toFixed(1)}%</span>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
+  </div>
+
   <!-- ── Account list ──────────────────────────────────────────────────── -->
   <div class="accounts-grid">
     {#each accounts as acc}
@@ -364,7 +490,13 @@
           <span class="acct-type-badge">{accountTypeLabels[acc.type]}</span>
         </div>
         <span class="acct-name">{acc.name}</span>
-        <span class="acct-currency">{acc.currency}</span>
+        <span class="acct-balance">
+          {#if latestBalancesMap.has(acc.id)}
+            <span class="acct-balance-amount">{formatCents(latestBalancesMap.get(acc.id)!)}</span>
+          {:else}
+            <span class="acct-balance-none text-muted">—</span>
+          {/if}
+        </span>
         <div class="acct-actions">
           <span class="acct-btn" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); openEditAccount(acc); }} onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); openEditAccount(acc); } }} aria-label="Modifica">✎</span>
           <span class="acct-btn acct-btn-del" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); deleteAccount(acc); }} onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); deleteAccount(acc); } }} aria-label="Elimina">✕</span>
@@ -376,7 +508,6 @@
   <!-- ── Account detail panel ──────────────────────────────────────────── -->
   {#if selectedAccount}
     <div class="detail-panel">
-      <!-- Current balance -->
       <div class="balance-hero" style="--accent-color: {selectedAccount.color}">
         <div class="balance-hero-left">
           <span class="balance-label">Saldo attuale</span>
@@ -391,7 +522,6 @@
         <Button onclick={openAddBalance}>+ Registra Saldo</Button>
       </div>
 
-      <!-- Balance line chart -->
       {#if sortedBalances.length >= 2}
         {@const path = balanceLinePath()}
         {@const areaPath = balanceAreaPath()}
@@ -410,7 +540,6 @@
             {#if path}
               <path d={path} fill="none" stroke={selectedAccount.color} stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
             {/if}
-            <!-- Dots -->
             {#each sortedBalances as b, i}
               {@const x = CHART_PAD + i * balStepX}
               {@const y = CHART_PAD + ((maxBal - b.balance) / balRange) * (CHART_H - CHART_PAD * 2)}
@@ -422,7 +551,6 @@
         </div>
       {/if}
 
-      <!-- Monthly deltas chart -->
       {#if monthlyDeltas.length > 0}
         <div class="chart-card">
           <h3 class="section-title">Variazioni Mensili</h3>
@@ -437,30 +565,22 @@
                 {@const h = Math.max(3, absH)}
                 {@const isPositive = delta >= 0}
                 {@const y = isPositive ? 160 - h : 160}
-                <rect
-                  x={x} y={y} width={barW} height={h}
-                  fill={isPositive ? 'var(--color-positive)' : 'var(--color-negative)'}
-                  rx="3"
-                >
+                <rect x={x} y={y} width={barW} height={h}
+                  fill={isPositive ? 'var(--color-positive)' : 'var(--color-negative)'} rx="3">
                   <title>{monthNamesShort[d.month - 1]} {d.year}: {formatCents(delta)}</title>
                 </rect>
-                <text
-                  x={x + barW / 2} y={174}
-                  text-anchor="middle" class="delta-label"
-                >{monthNamesShort[d.month - 1]}</text>
+                <text x={x + barW / 2} y={174} text-anchor="middle" class="delta-label">{monthNamesShort[d.month - 1]}</text>
               {/each}
             </svg>
           </div>
         </div>
       {/if}
 
-      <!-- Balance log table -->
       <div class="log-table-card">
         <div class="log-table-header">
           <h3 class="section-title">Registrazioni Saldo</h3>
           <span class="log-count">{balances.length} registrazioni</span>
         </div>
-
         {#if balances.length === 0}
           <p class="empty-log text-muted">Nessuna registrazione. Aggiungi il primo saldo.</p>
         {:else}
@@ -492,7 +612,7 @@
 <!-- ── Account modal ──────────────────────────────────────────────────── -->
 {#if showAccountModal}
   <div class="modal-overlay" onclick={() => showAccountModal = false} role="presentation">
-    <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog">
+    <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') showAccountModal = false; }}>
       <h3 class="modal-title">{editingAccount ? 'Modifica Conto' : 'Nuovo Conto'}</h3>
 
       <label class="field">
@@ -502,11 +622,16 @@
 
       <label class="field">
         <span class="field-label">Tipo</span>
-        <select class="field-input" bind:value={formType}>
-          {#each Object.entries(accountTypeLabels) as [val, label]}
-            <option value={val}>{label}</option>
+        <div class="chip-group">
+          {#each ACCOUNT_TYPE_ENTRIES as [val, label]}
+            <button
+              class="chip {formType === val ? 'chip-active' : ''}"
+              onclick={() => formType = val}
+            >
+              {accountTypeIcons[val]} {label}
+            </button>
           {/each}
-        </select>
+        </div>
       </label>
 
       <label class="field">
@@ -536,7 +661,7 @@
 <!-- ── Balance modal ──────────────────────────────────────────────────── -->
 {#if showBalanceModal}
   <div class="modal-overlay" onclick={() => showBalanceModal = false} role="presentation">
-    <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog">
+    <div class="modal" onclick={(e) => e.stopPropagation()} role="dialog" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') showBalanceModal = false; }}>
       <h3 class="modal-title">{editingBalance ? 'Modifica Saldo' : 'Registra Saldo'}</h3>
 
       <label class="field">
@@ -572,59 +697,105 @@
     justify-content: space-between;
     margin-bottom: var(--space-lg);
   }
-  .page-title {
-    font-size: var(--text-xl);
-  }
+  .page-title { font-size: var(--text-xl); }
 
   /* ── Loading / Error / Empty ────────────────────────────────────────────── */
-  .loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-md);
-    padding: var(--space-2xl);
-    color: var(--color-text-secondary);
-    font-size: var(--text-sm);
-  }
-  .spinner {
-    width: 28px;
-    height: 28px;
-    border: 3px solid var(--slate-200);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
+  .loading { display: flex; flex-direction: column; align-items: center; gap: var(--space-md); padding: var(--space-2xl); color: var(--color-text-secondary); font-size: var(--text-sm); }
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--slate-200); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  .error-card {
-    padding: var(--space-md);
-    background: var(--color-surface);
-    border: 1px solid var(--color-negative);
-    border-radius: var(--radius-lg);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-  }
-
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-2xl);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    text-align: center;
-  }
+  .error-card { padding: var(--space-md); background: var(--color-surface); border: 1px solid var(--color-negative); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: var(--space-sm); }
+  .empty-state { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-2xl); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); text-align: center; }
   .empty-icon { opacity: 0.4; margin-bottom: var(--space-sm); }
   .empty-text { font-size: var(--text-base); font-weight: 600; }
   .empty-sub { font-size: var(--text-sm); }
 
+  /* ════════════════════════════════════════════════════════════════════════ */
+  /* WEALTH OVERVIEW                                                         */
+  /* ════════════════════════════════════════════════════════════════════════ */
+  .wealth-section {
+    padding: var(--space-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--space-lg);
+  }
+
+  .wealth-hero {
+    text-align: center;
+    padding-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--slate-100);
+    margin-bottom: var(--space-lg);
+  }
+  .wealth-hero-label {
+    display: block;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-xs);
+  }
+  .wealth-hero-amount {
+    display: block;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-xs);
+  }
+  .wealth-hero-sub {
+    font-size: var(--text-sm);
+  }
+
+  .wealth-title {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    margin-bottom: var(--space-md);
+  }
+
+  .wealth-stacked-bar {
+    display: flex;
+    height: 8px;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-bottom: var(--space-md);
+    background: var(--slate-100);
+  }
+  .wealth-bar-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+    min-width: 2px;
+  }
+
+  .wealth-type-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .wealth-type-row {
+    display: grid;
+    grid-template-columns: 1.5rem 1fr 2rem 1fr 7rem 3.5rem;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--text-sm);
+  }
+  .wealth-type-icon { font-size: 1rem; text-align: center; }
+  .wealth-type-label { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wealth-type-count {
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    text-align: center;
+    font-family: var(--font-mono);
+  }
+  .wealth-type-bar-track { height: 16px; background: var(--slate-100); border-radius: var(--radius-sm); overflow: hidden; }
+  .wealth-type-bar-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.3s ease; min-width: 3px; }
+  .wealth-type-amount { font-family: var(--font-mono); font-weight: 600; text-align: right; font-size: var(--text-xs); }
+  .wealth-type-pct { font-family: var(--font-mono); color: var(--color-text-secondary); text-align: right; font-size: var(--text-xs); }
+
   /* ── Account grid ──────────────────────────────────────────────────────── */
   .accounts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: var(--space-md);
     margin-bottom: var(--space-lg);
   }
@@ -646,304 +817,111 @@
     color: var(--color-text);
     width: 100%;
   }
-  .account-card:hover {
-    box-shadow: var(--shadow-md);
-  }
-  .account-card-selected {
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px var(--accent-color), var(--shadow-sm);
-  }
+  .account-card:hover { box-shadow: var(--shadow-md); }
+  .account-card-selected { border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-color), var(--shadow-sm); }
 
-  .acct-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--space-xs);
-  }
+  .acct-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-xs); }
   .acct-icon { font-size: 1.25rem; }
-  .acct-type-badge {
-    font-size: 10px;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    padding: 0.125rem 0.375rem;
-    background: var(--slate-100);
-    border-radius: var(--radius-full);
-  }
-  .acct-name {
-    font-weight: 600;
-    font-size: var(--text-sm);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .acct-currency {
-    font-size: var(--text-xs);
-    color: var(--color-text-secondary);
-  }
-  .acct-actions {
-    display: flex;
-    gap: 0.25rem;
-    margin-top: var(--space-xs);
-    opacity: 0;
-    transition: opacity 0.15s;
-  }
-  .account-card:hover .acct-actions {
-    opacity: 1;
-  }
-  .acct-btn {
-    background: none;
-    border: none;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    font-size: 12px;
-    padding: 0.125rem 0.25rem;
-    border-radius: var(--radius-sm);
-    transition: color 0.15s, background 0.15s;
-  }
+  .acct-type-badge { font-size: 10px; font-weight: 500; color: var(--color-text-secondary); padding: 0.125rem 0.375rem; background: var(--slate-100); border-radius: var(--radius-full); }
+  .acct-name { font-weight: 600; font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .acct-balance { margin-top: var(--space-xs); }
+  .acct-balance-amount { font-family: var(--font-mono); font-weight: 700; font-size: var(--text-sm); }
+  .acct-balance-none { font-family: var(--font-mono); font-size: var(--text-sm); }
+  .acct-actions { display: flex; gap: 0.25rem; margin-top: var(--space-xs); opacity: 0; transition: opacity 0.15s; }
+  .account-card:hover .acct-actions { opacity: 1; }
+  .acct-btn { background: none; border: none; color: var(--color-text-secondary); cursor: pointer; font-size: 12px; padding: 0.125rem 0.25rem; border-radius: var(--radius-sm); transition: color 0.15s, background 0.15s; }
   .acct-btn:hover { color: var(--color-primary); background: var(--blue-50); }
   .acct-btn-del:hover { color: var(--color-negative); background: #fef2f2; }
 
   /* ── Detail panel ──────────────────────────────────────────────────────── */
-  .detail-panel {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-  }
+  .detail-panel { display: flex; flex-direction: column; gap: var(--space-md); }
 
-  .balance-hero {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-lg);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-left: 4px solid var(--accent-color);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-  }
-  .balance-hero-left {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-  }
-  .balance-label {
-    font-size: var(--text-xs);
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .balance-amount {
-    font-family: var(--font-mono);
-    font-weight: 700;
-    font-size: var(--text-2xl);
-  }
-  .balance-date {
-    font-size: var(--text-xs);
-  }
+  .balance-hero { display: flex; align-items: center; justify-content: space-between; padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-left: 4px solid var(--accent-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+  .balance-hero-left { display: flex; flex-direction: column; gap: 0.125rem; }
+  .balance-label { font-size: var(--text-xs); font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .balance-amount { font-family: var(--font-mono); font-weight: 700; font-size: var(--text-2xl); }
+  .balance-date { font-size: var(--text-xs); }
 
   /* ── Charts ────────────────────────────────────────────────────────────── */
-  .chart-card {
-    padding: var(--space-lg);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-  }
-  .section-title {
-    font-size: var(--text-base);
-    font-weight: 600;
-    margin-bottom: var(--space-md);
-  }
-
-  .line-chart {
-    width: 100%;
-    height: 220px;
-    display: block;
-  }
-
-  .delta-chart-container {
-    width: 100%;
-    overflow-x: auto;
-  }
-  .delta-chart {
-    width: 100%;
-    height: 180px;
-    display: block;
-    min-width: 200px;
-  }
-  .delta-label {
-    font-size: 9px;
-    fill: var(--color-text-secondary);
-    font-family: var(--font-sans);
-  }
+  .chart-card { padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+  .section-title { font-size: var(--text-base); font-weight: 600; margin-bottom: var(--space-md); }
+  .line-chart { width: 100%; height: 220px; display: block; }
+  .delta-chart-container { width: 100%; overflow-x: auto; }
+  .delta-chart { width: 100%; height: 180px; display: block; min-width: 200px; }
+  .delta-label { font-size: 9px; fill: var(--color-text-secondary); font-family: var(--font-sans); }
 
   /* ── Balance log table ─────────────────────────────────────────────────── */
-  .log-table-card {
-    padding: var(--space-lg);
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-  }
-  .log-table-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: var(--space-md);
-  }
-  .log-count {
-    font-size: var(--text-xs);
-    color: var(--color-text-secondary);
-    font-weight: 500;
-  }
-
-  .empty-log {
-    font-size: var(--text-sm);
-    text-align: center;
-    padding: var(--space-md);
-  }
-
-  .log-table {
-    display: flex;
-    flex-direction: column;
-  }
-  .log-row {
-    display: grid;
-    grid-template-columns: 7rem 1fr 1fr 4rem;
-    gap: var(--space-sm);
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--slate-100);
-    font-size: var(--text-sm);
-    align-items: center;
-  }
+  .log-table-card { padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+  .log-table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-md); }
+  .log-count { font-size: var(--text-xs); color: var(--color-text-secondary); font-weight: 500; }
+  .empty-log { font-size: var(--text-sm); text-align: center; padding: var(--space-md); }
+  .log-table { display: flex; flex-direction: column; }
+  .log-row { display: grid; grid-template-columns: 7rem 1fr 1fr 4rem; gap: var(--space-sm); padding: 0.5rem 0; border-bottom: 1px solid var(--slate-100); font-size: var(--text-sm); align-items: center; }
   .log-row:last-child { border-bottom: none; }
-  .log-row-header {
-    font-size: var(--text-xs);
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 2px solid var(--slate-200);
-    padding: 0.375rem 0;
-  }
-  .log-cell { }
+  .log-row-header { font-size: var(--text-xs); font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid var(--slate-200); padding: 0.375rem 0; }
   .log-date { font-family: var(--font-mono); color: var(--color-text-secondary); }
   .log-bal { font-family: var(--font-mono); font-weight: 600; }
   .log-bal-value { font-size: var(--text-sm); }
   .log-note { color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .log-actions {
-    display: flex;
-    gap: 0.25rem;
-    justify-content: flex-end;
-  }
-  .log-btn {
-    background: none;
-    border: none;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    font-size: 12px;
-    padding: 0.125rem 0.25rem;
-    border-radius: var(--radius-sm);
-    transition: color 0.15s, background 0.15s;
-  }
+  .log-actions { display: flex; gap: 0.25rem; justify-content: flex-end; }
+  .log-btn { background: none; border: none; color: var(--color-text-secondary); cursor: pointer; font-size: 12px; padding: 0.125rem 0.25rem; border-radius: var(--radius-sm); transition: color 0.15s, background 0.15s; }
   .log-btn:hover { color: var(--color-primary); background: var(--blue-50); }
   .log-btn-del:hover { color: var(--color-negative); background: #fef2f2; }
 
-  /* ── Modal ──────────────────────────────────────────────────────────────── */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.35);
-    backdrop-filter: blur(4px);
+  /* ── Chip group (tipo selector) ──────────────────────────────────────────── */
+  .chip-group {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 200;
-    padding: var(--space-md);
+    flex-wrap: wrap;
+    gap: var(--space-xs);
   }
-  .modal {
-    width: 100%;
-    max-width: 420px;
-    background: var(--color-surface);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
-    padding: var(--space-xl);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-  }
-  .modal-title {
-    font-size: var(--text-lg);
-    font-weight: 600;
-  }
-
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  .field-label {
+  .chip {
+    padding: 0.375rem 0.75rem;
     font-size: var(--text-xs);
     font-weight: 500;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-  .field-input {
-    padding: 0.5rem 0.75rem;
-    font-size: var(--text-sm);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-full);
     background: var(--color-surface);
-    color: var(--color-text);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
     font-family: inherit;
-    outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    white-space: nowrap;
   }
-  .field-input:focus {
+  .chip:hover {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    color: var(--color-primary);
+  }
+  .chip-active {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+  }
+  .chip-active:hover {
+    color: #fff;
   }
 
-  .color-picker-row {
-    display: flex;
-    gap: var(--space-xs);
-    flex-wrap: wrap;
-  }
-  .color-swatch {
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-full);
-    border: 2px solid transparent;
-    cursor: pointer;
-    transition: border-color 0.15s, transform 0.15s;
-  }
+  /* ── Modal ──────────────────────────────────────────────────────────────── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: var(--space-md); }
+  .modal { width: 100%; max-width: 420px; background: var(--color-surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl); padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-md); }
+  .modal-title { font-size: var(--text-lg); font-weight: 600; }
+  .field { display: flex; flex-direction: column; gap: 0.25rem; }
+  .field-label { font-size: var(--text-xs); font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+  .field-input { padding: 0.5rem 0.75rem; font-size: var(--text-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font-family: inherit; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+  .field-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+  .color-picker-row { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
+  .color-swatch { width: 32px; height: 32px; border-radius: var(--radius-full); border: 2px solid transparent; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
   .color-swatch:hover { transform: scale(1.1); }
   .color-swatch-active { border-color: var(--color-text); }
-
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-sm);
-    margin-top: var(--space-sm);
-  }
+  .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-sm); }
 
   /* ── Responsive ─────────────────────────────────────────────────────────── */
   @media (max-width: 640px) {
-    .accounts-grid {
-      grid-template-columns: 1fr 1fr;
-    }
-    .balance-hero {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: var(--space-md);
-    }
-    .log-row {
-      grid-template-columns: 6rem 1fr 3rem;
-    }
-    .log-note {
-      display: none;
-    }
+    .accounts-grid { grid-template-columns: 1fr 1fr; }
+    .balance-hero { flex-direction: column; align-items: flex-start; gap: var(--space-md); }
+    .log-row { grid-template-columns: 6rem 1fr 3rem; }
+    .log-note { display: none; }
+    .wealth-type-row { grid-template-columns: 1.5rem 1fr 2rem 5rem; }
+    .wealth-type-bar-track { display: none; }
+    .wealth-type-pct { display: none; }
   }
 </style>
