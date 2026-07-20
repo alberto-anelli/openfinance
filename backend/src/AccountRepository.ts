@@ -8,6 +8,7 @@ export interface AccountRepositoryConfig {
   dataDir: string;
   snapshotIntervalMs?: number;  // default 4h
   keepSnapshots?: number;        // default 10
+  debounceMs?: number;           // default 1000
 }
 
 export class NotFoundError extends Error {
@@ -25,6 +26,8 @@ export class AccountRepository {
   private readonly snapshotIntervalMs: number;
   private readonly keepSnapshots: number;
   private snapshotTimer: ReturnType<typeof setInterval> | null = null;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly debounceMs: number;
   private shuttingDown = false;
 
   constructor(config: AccountRepositoryConfig) {
@@ -32,6 +35,7 @@ export class AccountRepository {
     this.filePath = join(this.dataDir, 'accounts.json');
     this.snapshotIntervalMs = config.snapshotIntervalMs ?? 14400000; // 4h
     this.keepSnapshots = config.keepSnapshots ?? 10;
+    this.debounceMs = config.debounceMs ?? 1000;
   }
 
   get latestPath(): string {
@@ -111,6 +115,17 @@ export class AccountRepository {
     await rename(tmpPath, this.filePath);
   }
 
+  private scheduleWrite(): void {
+    if (this.shuttingDown) return;
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+    this.debounceTimer = setTimeout(() => {
+      this.debounceTimer = null;
+      this.save().catch(err => console.error('Debounced accounts save failed:', err));
+    }, this.debounceMs);
+  }
+
   /** Snapshot: saves latest + creates a timestamped copy, then rotates old ones */
   private async snapshot(): Promise<void> {
     try {
@@ -166,6 +181,10 @@ export class AccountRepository {
         clearInterval(this.snapshotTimer);
         this.snapshotTimer = null;
       }
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = null;
+      }
       try {
         await this.save();
         console.log('Final accounts save complete.');
@@ -215,7 +234,7 @@ export class AccountRepository {
       updatedAt: now,
     };
     this.accounts.set(account.id, account);
-    await this.save();
+    this.scheduleWrite();
     return account;
   }
 
@@ -234,7 +253,7 @@ export class AccountRepository {
     };
 
     this.accounts.set(id, updated);
-    await this.save();
+    this.scheduleWrite();
     return updated;
   }
 
@@ -251,7 +270,7 @@ export class AccountRepository {
       this.balanceLogs.delete(logId);
     }
 
-    await this.save();
+    this.scheduleWrite();
   }
 
   // ── Balance log CRUD ───────────────────────────────────────────────────
@@ -287,7 +306,7 @@ export class AccountRepository {
       createdAt: new Date().toISOString(),
     };
     this.balanceLogs.set(log.id, log);
-    await this.save();
+    this.scheduleWrite();
     return log;
   }
 
@@ -306,13 +325,13 @@ export class AccountRepository {
     };
 
     this.balanceLogs.set(id, updated);
-    await this.save();
+    this.scheduleWrite();
     return updated;
   }
 
   async deleteBalance(id: string): Promise<void> {
     if (!this.balanceLogs.has(id)) throw new NotFoundError(`Balance log ${id} not found`);
     this.balanceLogs.delete(id);
-    await this.save();
+    this.scheduleWrite();
   }
 }
