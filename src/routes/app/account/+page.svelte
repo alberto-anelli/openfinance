@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { api, type Account, type AccountBalanceLog, type AccountType } from '$lib/api/client';
+  import { api, type Account, type AccountBalanceLog } from '$lib/api/client';
   import { formatCents } from '$lib/format';
   import Button from '$lib/components/Button.svelte';
 
@@ -22,12 +22,13 @@
 
   // Form state
   let formName = $state('');
-  let formType = $state<AccountType>('bank');
+  let formType = $state('');
   let formColor = $state('#6366f1');
   let formBalance = $state('');
   let formDate = $state('');
   let formNote = $state('');
   let formSaving = $state(false);
+  let accountTypeSuggestions = $state<string[]>([]);
 
   // ── Derived ────────────────────────────────────────────────────────────
   let selectedAccount = $derived(
@@ -41,7 +42,7 @@
 
   // ── Wealth statistics ──────────────────────────────────────────────────
   interface TypeWealth {
-    type: AccountType;
+    type: string;
     label: string;
     icon: string;
     total: number;
@@ -49,7 +50,7 @@
     pct: number;
   }
 
-  const accountTypeLabels: Record<AccountType, string> = {
+  const accountTypeLabels: Record<string, string> = {
     bank: 'Conto Corrente',
     credit_card: 'Carta di Credito',
     debit_card: 'Carta di Debito',
@@ -58,7 +59,7 @@
     other: 'Altro',
   };
 
-  const accountTypeIcons: Record<AccountType, string> = {
+  const accountTypeIcons: Record<string, string> = {
     bank: '🏦',
     credit_card: '💳',
     debit_card: '💳',
@@ -67,7 +68,7 @@
     other: '📦',
   };
 
-  const accountTypeColors: Record<AccountType, string> = {
+  const accountTypeColors: Record<string, string> = {
     bank: '#2563eb',
     credit_card: '#f97316',
     debit_card: '#14b8a6',
@@ -76,12 +77,24 @@
     other: '#6b7280',
   };
 
+  function typeLabel(t: string): string {
+    return accountTypeLabels[t] ?? t;
+  }
+
+  function typeIcon(t: string): string {
+    return accountTypeIcons[t] ?? '📁';
+  }
+
+  function typeColor(t: string): string {
+    return accountTypeColors[t] ?? '#6b7280';
+  }
+
   let totalNetWorth = $derived(
     Array.from(latestBalancesMap.values()).reduce((sum, b) => sum + b, 0)
   );
 
   let wealthByType = $derived.by(() => {
-    const byType = new Map<AccountType, { total: number; count: number }>();
+    const byType = new Map<string, { total: number; count: number }>();
     for (const acc of accounts) {
       const bal = latestBalancesMap.get(acc.id) ?? 0;
       const entry = byType.get(acc.type) ?? { total: 0, count: 0 };
@@ -95,8 +108,8 @@
     for (const [type, data] of byType) {
       result.push({
         type,
-        label: accountTypeLabels[type],
-        icon: accountTypeIcons[type],
+        label: typeLabel(type),
+        icon: typeIcon(type),
         total: data.total,
         count: data.count,
         pct: totalNetWorth > 0 ? data.total / totalNetWorth : 0,
@@ -208,11 +221,18 @@
 
   onMount(loadAccounts);
 
+  // Load account type suggestions
+  $effect(() => {
+    api.accountTypes().then(types => {
+      accountTypeSuggestions = types;
+    }).catch(() => { /* ignore */ });
+  });
+
   // ── Account CRUD ───────────────────────────────────────────────────────
   function openAddAccount() {
     editingAccount = null;
     formName = '';
-    formType = 'bank';
+    formType = '';
     formColor = '#6366f1';
     showAccountModal = true;
   }
@@ -394,8 +414,7 @@
     return eur.toFixed(0) + '€';
   }
 
-  const ACCOUNT_TYPE_ENTRIES = Object.entries(accountTypeLabels) as [AccountType, string][];
-</script>
+  </script>
 
 <svelte:head>
   <title>Conti — Bilancio</title>
@@ -447,7 +466,7 @@
           {#each wealthByType as w}
             <div
               class="wealth-bar-segment"
-              style="width: {w.pct * 100}%; background: {accountTypeColors[w.type]}"
+              style="width: {w.pct * 100}%; background: {typeColor(w.type)}"
               title="{w.label}: {formatCents(w.total)}"
             ></div>
           {/each}
@@ -461,7 +480,7 @@
               <div class="wealth-type-bar-track">
                 <div
                   class="wealth-type-bar-fill"
-                  style="width: {(w.total / maxTypeWealth) * 100}%; background: {accountTypeColors[w.type]}"
+                  style="width: {(w.total / maxTypeWealth) * 100}%; background: {typeColor(w.type)}"
                 ></div>
               </div>
               <span class="wealth-type-amount">{formatCents(w.total)}</span>
@@ -486,8 +505,8 @@
         style="--accent-color: {acc.color}"
       >
         <div class="acct-top">
-          <span class="acct-icon">{accountTypeIcons[acc.type]}</span>
-          <span class="acct-type-badge">{accountTypeLabels[acc.type]}</span>
+          <span class="acct-icon">{typeIcon(acc.type)}</span>
+          <span class="acct-type-badge">{typeLabel(acc.type)}</span>
         </div>
         <span class="acct-name">{acc.name}</span>
         <span class="acct-balance">
@@ -622,16 +641,26 @@
 
       <label class="field">
         <span class="field-label">Tipo</span>
-        <div class="chip-group">
-          {#each ACCOUNT_TYPE_ENTRIES as [val, label]}
-            <button
-              class="chip {formType === val ? 'chip-active' : ''}"
-              onclick={() => formType = val}
-            >
-              {accountTypeIcons[val]} {label}
-            </button>
-          {/each}
-        </div>
+        <input
+          type="text"
+          class="field-input"
+          bind:value={formType}
+          placeholder="es. Conto Corrente, Carta, Contanti..."
+        />
+        {#if accountTypeSuggestions.length > 0}
+          <div class="tag-suggestions">
+            {#each accountTypeSuggestions as t}
+              <button
+                type="button"
+                class="tag"
+                class:tag-active={formType === t}
+                onclick={() => formType = t}
+              >
+                {t}
+              </button>
+            {/each}
+          </div>
+        {/if}
       </label>
 
       <label class="field">
@@ -868,14 +897,15 @@
   .log-btn:hover { color: var(--color-primary); background: var(--blue-50); }
   .log-btn-del:hover { color: var(--color-negative); background: #fef2f2; }
 
-  /* ── Chip group (tipo selector) ──────────────────────────────────────────── */
-  .chip-group {
+  /* ── Tag suggestions (tipo selector) ──────────────────────────────────────── */
+  .tag-suggestions {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-xs);
+    margin-top: var(--space-xs);
   }
-  .chip {
-    padding: 0.375rem 0.75rem;
+  .tag {
+    padding: 0.25rem 0.65rem;
     font-size: var(--text-xs);
     font-weight: 500;
     border: 1px solid var(--color-border);
@@ -885,18 +915,18 @@
     cursor: pointer;
     transition: all 0.15s;
     font-family: inherit;
-    white-space: nowrap;
+    line-height: 1.4;
   }
-  .chip:hover {
+  .tag:hover {
     border-color: var(--color-primary);
     color: var(--color-primary);
   }
-  .chip-active {
+  .tag-active {
     background: var(--color-primary);
     color: #fff;
     border-color: var(--color-primary);
   }
-  .chip-active:hover {
+  .tag-active:hover {
     color: #fff;
   }
 

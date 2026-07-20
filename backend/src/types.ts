@@ -6,6 +6,7 @@ export interface Transaction {
   description?: string;  // opzionale, solo expense
   date: string;          // 'YYYY-MM-DD'
   createdAt: string;     // ISO datetime
+  accountId?: string;    // riferimento a un conto (opzionale)
 }
 
 export interface DumpFile {
@@ -39,7 +40,7 @@ export interface ApiError {
 
 // ── Account types ────────────────────────────────────────────────────────
 
-export type AccountType = 'bank' | 'credit_card' | 'debit_card' | 'savings' | 'cash' | 'other';
+export type AccountType = string;
 
 export interface Account {
   id: string;

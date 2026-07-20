@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { getBasePath } from '$lib/base';
-  import { api, type Transaction, type MonthSummary, type YearSummary } from '$lib/api/client';
+  import { api, type Transaction, type MonthSummary, type YearSummary, type Account } from '$lib/api/client';
   import { formatCents } from '$lib/format';
   import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
@@ -20,6 +20,7 @@
   let error = $state('');
   let selectedCategory = $state<string | null>(null);
   let showYearTable = $state(false);
+  let accounts = $state<Account[]>([]);
   let expandedId = $state<string | null>(null);
   let toastVisible = $state(false);
   let toastMessage = $state('');
@@ -35,6 +36,12 @@
   );
 
   // --- Functions ---
+  function accountName(accountId: string | undefined): string {
+    if (!accountId) return '';
+    const acc = accounts.find(a => a.id === accountId);
+    return acc ? acc.name : '';
+  }
+
   function uniqCategories(txs: Transaction[]): string[] {
     const cats = new Set(txs.map(tx => tx.category));
     return Array.from(cats).sort();
@@ -73,14 +80,16 @@
     loading = true;
     error = '';
     try {
-      const [txs, mSummary, ySummary] = await Promise.all([
+      const [txs, mSummary, ySummary, accs] = await Promise.all([
         api.list({ year: currentYear, month: currentMonth }),
         api.monthSummary(currentYear, currentMonth),
         api.yearSummary(currentYear),
+        api.listAccounts(),
       ]);
       transactions = txs;
       monthSummary = mSummary;
       yearSummary = ySummary;
+      accounts = accs;
     } catch (err) {
       error = err instanceof Error ? err.message : 'Errore nel caricamento';
     } finally {
@@ -188,6 +197,9 @@
             >
               <span class="tx-category">{tx.category}</span>
               <span class="tx-date text-muted">{formatDate(tx.date)}</span>
+              {#if tx.accountId}
+                <span class="tx-account text-muted">→ {accountName(tx.accountId)}</span>
+              {/if}
             </div>
             <div class="tx-amount-group">
               <span
@@ -382,6 +394,10 @@
   }
   .tx-date {
     font-size: var(--text-xs);
+  }
+  .tx-account {
+    font-size: var(--text-xs);
+    font-style: italic;
   }
   .tx-amount-group {
     display: flex;

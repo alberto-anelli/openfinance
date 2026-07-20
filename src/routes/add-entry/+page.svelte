@@ -19,12 +19,14 @@
   let amount = $state(0);
   let category = $state('stipendio');
   let date = $state(today());
+  let accountId = $state('');
   let saving = $state(false);
   let loading = $state(false);
   let error = $state('');
   let toastVisible = $state(false);
   let toastMessage = $state('');
   let toastType: 'success' | 'error' = $state('success');
+  let accounts: { id: string; name: string }[] = $state([]);
 
   const editingId = $derived(page.url.searchParams.get('id'));
 
@@ -41,12 +43,20 @@
         amount = tx.amount;
         category = tx.category;
         date = tx.date;
+        accountId = tx.accountId ?? '';
       }).catch(err => {
         error = err instanceof Error ? err.message : 'Errore nel caricamento';
       }).finally(() => {
         loading = false;
       });
     }
+  });
+
+  // Load accounts for the account selector
+  $effect(() => {
+    api.listAccounts().then(accs => {
+      accounts = accs.map(a => ({ id: a.id, name: a.name }));
+    }).catch(() => { /* ignore */ });
   });
 
   function validate(): boolean {
@@ -63,7 +73,7 @@
     saving = true;
     try {
       if (editingId) {
-        await api.update(editingId, { amount, category, date });
+        await api.update(editingId, { amount, category, date, accountId: accountId || undefined });
         toastMessage = 'Entrata modificata!';
         toastType = 'success';
         toastVisible = true;
@@ -74,6 +84,7 @@
           amount,
           category,
           date,
+          accountId: accountId || undefined,
         });
         toastMessage = 'Entrata aggiunta!';
         toastType = 'success';
@@ -124,6 +135,18 @@
           <select id="category" bind:value={category} class="select">
             {#each INCOME_CATEGORIES as cat}
               <option value={cat.value}>{cat.label}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="account" class="field-label">
+            Conto <span class="optional">(opzionale)</span>
+          </label>
+          <select id="account" bind:value={accountId} class="select">
+            <option value="">— Nessun conto —</option>
+            {#each accounts as acc}
+              <option value={acc.id}>{acc.name}</option>
             {/each}
           </select>
         </div>

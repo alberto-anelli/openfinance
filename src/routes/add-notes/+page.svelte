@@ -13,6 +13,7 @@
   let category = $state('');
   let description = $state('');
   let date = $state(today());
+  let accountId = $state('');
   let saving = $state(false);
   let loading = $state(false);
   let error = $state('');
@@ -20,6 +21,7 @@
   let toastMessage = $state('');
   let toastType: 'success' | 'error' = $state('success');
   let suggestions: string[] = $state([]);
+  let accounts: { id: string; name: string }[] = $state([]);
 
   const editingId = $derived(page.url.searchParams.get('id'));
 
@@ -32,6 +34,13 @@
   $effect(() => {
     api.expenseCategories().then(cats => {
       suggestions = cats;
+    }).catch(() => { /* ignore */ });
+  });
+
+  // Load accounts for the account selector
+  $effect(() => {
+    api.listAccounts().then(accs => {
+      accounts = accs.map(a => ({ id: a.id, name: a.name }));
     }).catch(() => { /* ignore */ });
   });
 
@@ -73,6 +82,7 @@
       category: category.trim(),
       description: description.trim() || undefined,
       date,
+      accountId: accountId || undefined,
     };
 
     try {
@@ -174,6 +184,18 @@
           />
         </div>
 
+        <div class="field">
+          <label for="account" class="field-label">
+            Conto <span class="optional">(opzionale)</span>
+          </label>
+          <select id="account" bind:value={accountId} class="select">
+            <option value="">— Nessun conto —</option>
+            {#each accounts as acc}
+              <option value={acc.id}>{acc.name}</option>
+            {/each}
+          </select>
+        </div>
+
         <DatePicker
           bind:value={date}
           label="Data"
@@ -249,6 +271,24 @@
     width: 100%;
   }
   .input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--blue-100);
+  }
+  .select {
+    padding: 0.625rem 0.75rem;
+    font-size: var(--text-base);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+    width: 100%;
+    cursor: pointer;
+    appearance: auto;
+    font-family: inherit;
+  }
+  .select:focus {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px var(--blue-100);
   }

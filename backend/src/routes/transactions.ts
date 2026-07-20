@@ -17,22 +17,26 @@ export default function createTransactionRouter(repo: Repository): Router {
         return;
       }
 
-      const { type, amount, category, description, date } = req.body as {
+      const { type, amount, category, description, date, accountId } = req.body as {
         type: 'expense' | 'income';
         amount: number;
         category: string;
         description?: string | null;
         date: string;
+        accountId?: string | null;
       };
 
-      const cleaned: { type: 'expense' | 'income'; amount: number; category: string; description?: string; date: string } = {
+      const cleaned: { type: 'expense' | 'income'; amount: number; category: string; description?: string; date: string; accountId?: string } = {
         type,
         amount,
-        category: type === 'expense' ? category.trim() : category,
+        category: category.trim(),
         date,
       };
       if (description && typeof description === 'string') {
         cleaned.description = description.trim();
+      }
+      if (accountId && typeof accountId === 'string') {
+        cleaned.accountId = accountId;
       }
 
       const tx = await repo.add(cleaned);
@@ -63,6 +67,9 @@ export default function createTransactionRouter(repo: Repository): Router {
       }
       if (req.query.category && typeof req.query.category === 'string') {
         filter.category = req.query.category;
+      }
+      if (req.query.accountId && typeof req.query.accountId === 'string') {
+        filter.accountId = req.query.accountId;
       }
 
       const transactions = await repo.list(filter as Parameters<Repository['list']>[0]);

@@ -9,6 +9,7 @@ export interface Repository {
     month?: number;
     type?: Transaction['type'];
     category?: string;
+    accountId?: string;
   }): Promise<Transaction[]>;
   getById(id: string): Promise<Transaction | null>;
 }

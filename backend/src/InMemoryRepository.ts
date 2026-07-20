@@ -100,6 +100,7 @@ export class InMemoryRepository implements Repository {
     month?: number;
     type?: Transaction['type'];
     category?: string;
+    accountId?: string;
   }): Promise<Transaction[]> {
     let result = Array.from(this.data.values());
 
@@ -121,6 +122,9 @@ export class InMemoryRepository implements Repository {
           const d = new Date(tx.date);
           return d.getMonth() + 1 === filter.month;
         });
+      }
+      if (filter.accountId) {
+        result = result.filter(tx => tx.accountId === filter.accountId);
       }
     }
 

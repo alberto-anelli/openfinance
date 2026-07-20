@@ -1,6 +1,5 @@
 import type { Transaction } from './types.js';
 
-const INCOME_CATEGORIES = ['stipendio', 'tredicesima', 'quattordicesima', 'regalo'] as const;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 export type ValidationError = { field: string; message: string };
@@ -43,19 +42,9 @@ export function validateTransaction(
     if (typeof body.category !== 'string') {
       errors.push({ field: 'category', message: 'category must be a string' });
     } else {
-      const type = body.type as string;
-      if (type === 'income') {
-        if (!INCOME_CATEGORIES.includes(body.category as typeof INCOME_CATEGORIES[number])) {
-          errors.push({
-            field: 'category',
-            message: `category must be one of: ${INCOME_CATEGORIES.join(', ')}`,
-          });
-        }
-      } else {
-        const trimmed = body.category.trim();
-        if (trimmed.length === 0 || trimmed.length > 60) {
-          errors.push({ field: 'category', message: 'category must be 1-60 characters' });
-        }
+      const trimmed = body.category.trim();
+      if (trimmed.length === 0 || trimmed.length > 60) {
+        errors.push({ field: 'category', message: 'category must be 1-60 characters' });
       }
     }
   }
@@ -66,7 +55,7 @@ export function validateTransaction(
 export function validatePatch(
   body: Record<string, unknown>
 ): { cleaned: Record<string, unknown>; errors: ValidationError[] } {
-  const allowedFields = ['type', 'amount', 'category', 'description', 'date'];
+  const allowedFields = ['type', 'amount', 'category', 'description', 'date', 'accountId'];
   const cleaned: Record<string, unknown> = {};
 
   for (const key of allowedFields) {

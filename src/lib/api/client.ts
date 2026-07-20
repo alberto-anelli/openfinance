@@ -12,6 +12,7 @@ export interface Transaction {
   description?: string;
   date: string; // YYYY-MM-DD
   createdAt: string;
+  accountId?: string; // riferimento a un conto
 }
 
 export interface MonthSummary {
@@ -36,7 +37,7 @@ export interface ApiError {
 
 // ── Account types ────────────────────────────────────────────────────────
 
-export type AccountType = 'bank' | 'credit_card' | 'debit_card' | 'savings' | 'cash' | 'other';
+export type AccountType = string;
 
 export interface Account {
   id: string;
@@ -46,6 +47,10 @@ export interface Account {
   color: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AccountWithBalance extends Account {
+  latestBalance: number | null;
 }
 
 export interface AccountBalanceLog {
@@ -75,19 +80,20 @@ class ApiClient {
   }
 
   // Transactions
-  create(data: { type: 'expense' | 'income'; amount: number; category: string; description?: string; date: string }) {
+  create(data: { type: 'expense' | 'income'; amount: number; category: string; description?: string; date: string; accountId?: string }) {
     return this.request<Transaction>('/transactions', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  list(params?: { year?: number; month?: number; type?: string; category?: string }) {
+  list(params?: { year?: number; month?: number; type?: string; category?: string; accountId?: string }) {
     const qs = new URLSearchParams();
     if (params?.year) qs.set('year', String(params.year));
     if (params?.month) qs.set('month', String(params.month));
     if (params?.type) qs.set('type', params.type);
     if (params?.category) qs.set('category', params.category);
+    if (params?.accountId) qs.set('accountId', params.accountId);
     const query = qs.toString();
     return this.request<Transaction[]>(`/transactions${query ? `?${query}` : ''}`);
   }
@@ -128,7 +134,7 @@ class ApiClient {
     return this.request<Account[]>('/accounts');
   }
 
-  createAccount(data: { name: string; type: AccountType; currency?: string; color?: string }) {
+  createAccount(data: { name: string; type: string; currency?: string; color?: string }) {
     return this.request<Account>('/accounts', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -148,6 +154,16 @@ class ApiClient {
 
   deleteAccount(id: string) {
     return this.request<void>(`/accounts/${id}`, { method: 'DELETE' });
+  }
+
+  // ── Account types ──────────────────────────────────────────────────────
+  async accountTypes(): Promise<string[]> {
+    return this.request<string[]>('/accounts/types');
+  }
+
+  // ── Wealth ─────────────────────────────────────────────────────────────
+  wealth() {
+    return this.request<AccountWithBalance[]>('/accounts/wealth');
   }
 
   // ── Balance logs ───────────────────────────────────────────────────────

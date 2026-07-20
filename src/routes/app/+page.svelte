@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { getBasePath } from '$lib/base';
-  import { api, type Transaction, type MonthSummary, type YearSummary } from '$lib/api/client';
+  import { api, type Transaction, type MonthSummary, type YearSummary, type Account, type AccountWithBalance } from '$lib/api/client';
   import { formatCents } from '$lib/format';
   import Button from '$lib/components/Button.svelte';
   import Card from '$lib/components/Card.svelte';
@@ -15,7 +15,38 @@
   let monthSummary = $state<MonthSummary | null>(null);
   let loading = $state(true);
   let error = $state('');
-  let yearInput = $state(String(selectedYear));
+  let yearInput = $state(String(now.getFullYear()));
+
+  // ── Wealth state ─────────────────────────────────────────────────────────
+  let wealthAccounts = $state<AccountWithBalance[]>([]);
+  let wealthLoading = $state(false);
+  let allAccounts = $state<Account[]>([]);
+
+  let totalNetWorth = $derived(
+    wealthAccounts.reduce((sum, a) => sum + (a.latestBalance ?? 0), 0)
+  );
+
+  let wealthByType = $derived.by(() => {
+    const byType = new Map<string, { total: number; count: number }>();
+    for (const acc of wealthAccounts) {
+      const bal = acc.latestBalance ?? 0;
+      const entry = byType.get(acc.type) ?? { total: 0, count: 0 };
+      entry.total += bal;
+      entry.count++;
+      byType.set(acc.type, entry);
+    }
+    const maxTotal = Math.max(1, ...Array.from(byType.values()).map(e => e.total));
+    const result: { type: string; total: number; count: number; pct: number }[] = [];
+    for (const [type, data] of byType) {
+      result.push({ type, total: data.total, count: data.count, pct: totalNetWorth > 0 ? data.total / totalNetWorth : 0 });
+    }
+    result.sort((a, b) => b.total - a.total);
+    return result;
+  });
+
+  let maxTypeWealth = $derived(
+    wealthByType.length > 0 ? Math.max(...wealthByType.map(w => w.total)) : 1
+  );
 
   const monthNames = [
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
@@ -197,7 +228,34 @@
     }
   }
 
-  onMount(loadData);
+  onMount(() => {
+    loadData();
+    loadWealth();
+  });
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function accountName(accountId: string | undefined): string {
+    if (!accountId) return '';
+    const acc = allAccounts.find(a => a.id === accountId);
+    return acc ? acc.name : '';
+  }
+
+  // ── Wealth loading ─────────────────────────────────────────────────────
+  async function loadWealth() {
+    wealthLoading = true;
+    try {
+      const [wealth, accs] = await Promise.all([
+        api.wealth(),
+        api.listAccounts(),
+      ]);
+      wealthAccounts = wealth;
+      allAccounts = accs;
+    } catch {
+      // silently fail — wealth is supplementary
+    } finally {
+      wealthLoading = false;
+    }
+  }
 
   // ── Chart helpers ──────────────────────────────────────────────────────
   const BAR_W = 32;
@@ -314,6 +372,48 @@
               {formatCents(yearSummary.totalDifference)}
             </span>
           </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Wealth overview -->
+    {#if wealthAccounts.length > 0}
+      <div class="wealth-section">
+        <div class="wealth-hero">
+          <span class="wealth-hero-label">Patrimonio Netto</span>
+          <span class="wealth-hero-amount {totalNetWorth >= 0 ? 'text-positive' : 'text-negative'}">
+            {formatCents(totalNetWorth)}
+          </span>
+          <span class="wealth-hero-sub text-muted">{wealthAccounts.length} conti</span>
+        </div>
+
+        {#if wealthByType.length > 1}
+          <div class="wealth-stacked-bar">
+            {#each wealthByType as w}
+              <div
+                class="wealth-bar-segment"
+                style="width: {w.pct * 100}%"
+                title="{w.type}: {formatCents(w.total)}"
+              ></div>
+            {/each}
+          </div>
+        {/if}
+
+        <div class="wealth-type-list">
+          {#each wealthByType as w}
+            <div class="wealth-type-row">
+              <span class="wealth-type-label">{w.type}</span>
+              <span class="wealth-type-count">{w.count}</span>
+              <div class="wealth-type-bar-track">
+                <div
+                  class="wealth-type-bar-fill"
+                  style="width: {(w.total / maxTypeWealth) * 100}%"
+                ></div>
+              </div>
+              <span class="wealth-type-amount">{formatCents(w.total)}</span>
+              <span class="wealth-type-pct">{(w.pct * 100).toFixed(1)}%</span>
+            </div>
+          {/each}
         </div>
       </div>
     {/if}
@@ -521,6 +621,9 @@
                 <span class="tx-desc text-muted">{tx.description}</span>
               {:else}
                 <span class="tx-desc-empty"></span>
+              {/if}
+              {#if tx.accountId}
+                <span class="tx-account text-muted">→ {accountName(tx.accountId)}</span>
               {/if}
               <span class="tx-amount {tx.type === 'income' ? 'text-income' : 'text-expense'}">
                 {tx.type === 'income' ? '+' : '–'}{formatCents(tx.amount)}
@@ -745,6 +848,85 @@
     text-overflow: ellipsis;
   }
 
+  /* ── Wealth overview ──────────────────────────────────────────────────────── */
+  .wealth-section {
+    padding: var(--space-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: var(--space-lg);
+  }
+
+  .wealth-hero {
+    text-align: center;
+    padding-bottom: var(--space-lg);
+    border-bottom: 1px solid var(--gray-100);
+    margin-bottom: var(--space-lg);
+  }
+  .wealth-hero-label {
+    display: block;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-xs);
+  }
+  .wealth-hero-amount {
+    display: block;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: var(--text-2xl);
+    margin-bottom: var(--space-xs);
+  }
+  .wealth-hero-sub {
+    font-size: var(--text-sm);
+  }
+
+  .wealth-stacked-bar {
+    display: flex;
+    height: 8px;
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    margin-bottom: var(--space-md);
+    background: var(--gray-100);
+  }
+  .wealth-bar-segment {
+    height: 100%;
+    transition: width 0.3s ease;
+    min-width: 2px;
+  }
+  .wealth-bar-segment:nth-child(1) { background: var(--blue-500); }
+  .wealth-bar-segment:nth-child(2) { background: var(--orange-500); }
+  .wealth-bar-segment:nth-child(3) { background: var(--green-500); }
+  .wealth-bar-segment:nth-child(4) { background: var(--purple-500); }
+  .wealth-bar-segment:nth-child(5) { background: var(--pink-500); }
+
+  .wealth-type-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .wealth-type-row {
+    display: grid;
+    grid-template-columns: 1fr 2rem 1fr 7rem 3.5rem;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: var(--text-sm);
+  }
+  .wealth-type-label { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wealth-type-count {
+    font-size: var(--text-xs);
+    color: var(--color-text-secondary);
+    text-align: center;
+    font-family: var(--font-mono);
+  }
+  .wealth-type-bar-track { height: 16px; background: var(--gray-100); border-radius: var(--radius-sm); overflow: hidden; }
+  .wealth-type-bar-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.3s ease; min-width: 3px; background: var(--blue-500); }
+  .wealth-type-amount { font-family: var(--font-mono); font-weight: 600; text-align: right; font-size: var(--text-xs); }
+  .wealth-type-pct { font-family: var(--font-mono); color: var(--color-text-secondary); text-align: right; font-size: var(--text-xs); }
+
   /* ── Chart card ─────────────────────────────────────────────────────────── */
   .chart-card {
     padding: var(--space-lg);
@@ -946,7 +1128,7 @@
   }
   .tx-row {
     display: grid;
-    grid-template-columns: 4.5rem 1fr 1fr 7rem;
+    grid-template-columns: 4.5rem 1fr 1fr 1fr 7rem;
     align-items: center;
     gap: var(--space-sm);
     padding: 0.5rem 0;
@@ -976,6 +1158,14 @@
   }
   .tx-desc-empty {
     /* empty cell for grid alignment */
+  }
+  .tx-account {
+    font-size: var(--text-xs);
+    font-style: italic;
+    color: var(--color-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .tx-amount {
     font-family: var(--font-mono);
@@ -1010,6 +1200,9 @@
       display: none;
     }
     .tx-desc-empty {
+      display: none;
+    }
+    .tx-account {
       display: none;
     }
     .chart-card {

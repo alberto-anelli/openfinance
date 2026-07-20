@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { AccountRepository, NotFoundError } from '../AccountRepository.js';
 import type { AccountType } from '../types.js';
 
-const VALID_TYPES: AccountType[] = ['bank', 'credit_card', 'debit_card', 'savings', 'cash', 'other'];
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 export default function createAccountRouter(repo: AccountRepository): Router {
@@ -21,6 +20,36 @@ export default function createAccountRouter(repo: AccountRepository): Router {
     }
   });
 
+  // GET /api/accounts/types — unique account types used
+  router.get('/accounts/types', async (_req, res) => {
+    try {
+      const accounts = await repo.listAccounts();
+      const types = new Set(accounts.map(a => a.type));
+      res.json(Array.from(types).sort());
+    } catch (err) {
+      console.error('GET /accounts/types error:', err);
+      res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
+    }
+  });
+
+  // GET /api/accounts/wealth — all accounts with latest balance
+  router.get('/accounts/wealth', async (_req, res) => {
+    try {
+      const accounts = await repo.listAccounts();
+      const result = await Promise.all(accounts.map(async (acc) => {
+        const balances = await repo.listBalances(acc.id);
+        const latestBalance = balances.length > 0
+          ? balances.reduce((a, b) => a.date > b.date ? a : b).balance
+          : null;
+        return { ...acc, latestBalance };
+      }));
+      res.json(result);
+    } catch (err) {
+      console.error('GET /accounts/wealth error:', err);
+      res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
+    }
+  });
+
   // POST /api/accounts
   router.post('/accounts', async (req, res) => {
     try {
@@ -30,8 +59,8 @@ export default function createAccountRouter(repo: AccountRepository): Router {
       if (!name || typeof name !== 'string' || name.trim().length === 0) {
         errors.push('name is required');
       }
-      if (!type || !VALID_TYPES.includes(type as AccountType)) {
-        errors.push(`type must be one of: ${VALID_TYPES.join(', ')}`);
+      if (!type || typeof type !== 'string' || type.trim().length === 0) {
+        errors.push('type is required');
       }
       if (currency !== undefined && (typeof currency !== 'string' || currency.length < 1)) {
         errors.push('currency must be a non-empty string');
