@@ -261,7 +261,7 @@ export class AccountRepository {
     for (const log of this.balanceLogs.values()) {
       if (log.accountId === accountId) logs.push(log);
     }
-    return logs.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+    return logs.sort((a, b) => b.date.localeCompare(a.date));
   }
 
   async getBalance(id: string): Promise<AccountBalanceLog | null> {
@@ -302,6 +302,7 @@ export class AccountRepository {
       date: patch.date ?? existing.date,
       note: patch.note !== undefined ? patch.note : existing.note,
       createdAt: existing.createdAt,
+      updatedAt: new Date().toISOString(),
     };
 
     this.balanceLogs.set(id, updated);

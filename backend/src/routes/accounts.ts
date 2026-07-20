@@ -107,7 +107,7 @@ export default function createAccountRouter(repo: AccountRepository): Router {
 
       const balances = await repo.listBalances(req.params.id);
       // The repo already returns sorted desc by date; reverse for asc
-      const sortedBalances = [...balances].sort((a, b) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt));
+      const sortedBalances = [...balances].sort((a, b) => a.date.localeCompare(b.date));
 
       // We need transactions linked to this account — access via the transaction repo
       // This requires the transaction Repository. We'll pass it via router.

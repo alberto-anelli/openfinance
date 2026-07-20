@@ -59,7 +59,8 @@ export interface AccountBalanceLog {
   balance: number;    // centesimi
   date: string;       // YYYY-MM-DD
   note?: string;
-  createdAt: string;
+  createdAt: string;  // ISO datetime — audit only
+  updatedAt?: string; // ISO datetime — audit only, set on update
 }
 
 class ApiClient {
