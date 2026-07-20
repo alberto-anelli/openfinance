@@ -6,6 +6,8 @@ import type { Account, AccountBalanceLog, AccountDumpFile, AccountType } from '.
 
 export interface AccountRepositoryConfig {
   dataDir: string;
+  snapshotIntervalMs?: number;  // default 4h
+  keepSnapshots?: number;        // default 10
 }
 
 export class NotFoundError extends Error {
@@ -20,11 +22,16 @@ export class AccountRepository {
   private readonly balanceLogs = new Map<string, AccountBalanceLog>();
   private readonly dataDir: string;
   private readonly filePath: string;
-  private initialized = false;
+  private readonly snapshotIntervalMs: number;
+  private readonly keepSnapshots: number;
+  private snapshotTimer: ReturnType<typeof setInterval> | null = null;
+  private shuttingDown = false;
 
   constructor(config: AccountRepositoryConfig) {
     this.dataDir = config.dataDir;
     this.filePath = join(this.dataDir, 'accounts.json');
+    this.snapshotIntervalMs = config.snapshotIntervalMs ?? 14400000; // 4h
+    this.keepSnapshots = config.keepSnapshots ?? 10;
   }
 
   get latestPath(): string {
@@ -34,30 +41,61 @@ export class AccountRepository {
   // ── Persistence ────────────────────────────────────────────────────────
 
   async init(): Promise<void> {
-    if (this.initialized) return;
-    this.initialized = true;
-
+    // Try accounts.json first
     if (existsSync(this.filePath)) {
       try {
         const data = await readFile(this.filePath, 'utf-8');
         const parsed = JSON.parse(data) as AccountDumpFile;
         if (this.isValidDump(parsed)) {
-          for (const acc of parsed.accounts) {
-            this.accounts.set(acc.id, acc);
-          }
-          for (const log of parsed.balanceLogs) {
-            this.balanceLogs.set(log.id, log);
-          }
-          console.log(`Loaded ${this.accounts.size} accounts, ${this.balanceLogs.size} balance logs`);
+          this.loadFromDump(parsed);
           return;
         }
-        console.warn('accounts.json corrupted, starting fresh');
+        console.warn('accounts.json corrupted, trying rotated snapshots...');
       } catch {
-        console.warn('accounts.json unreadable, starting fresh');
+        console.warn('accounts.json unreadable, trying rotated snapshots...');
       }
-    } else {
-      console.log('No accounts.json found, starting fresh');
     }
+
+    // Fallback: try rotated snapshots
+    try {
+      const files = await readdir(this.dataDir);
+      const snapFiles = files
+        .filter(f => f.startsWith('accounts-') && f.endsWith('.json') && f !== 'accounts.json')
+        .sort()
+        .reverse();
+
+      for (const file of snapFiles) {
+        try {
+          const data = await readFile(join(this.dataDir, file), 'utf-8');
+          const parsed = JSON.parse(data) as AccountDumpFile;
+          if (this.isValidDump(parsed)) {
+            this.loadFromDump(parsed);
+            console.log(`Restored accounts from ${file}`);
+            return;
+          }
+        } catch {
+          continue;
+        }
+      }
+    } catch {
+      // dataDir can't be read
+    }
+
+    console.log('No valid accounts dump found, starting fresh');
+    this.setupPeriodicSnapshot();
+    this.setupShutdownHook();
+  }
+
+  private loadFromDump(dump: AccountDumpFile): void {
+    for (const acc of dump.accounts) {
+      this.accounts.set(acc.id, acc);
+    }
+    for (const log of dump.balanceLogs) {
+      this.balanceLogs.set(log.id, log);
+    }
+    console.log(`Loaded ${this.accounts.size} accounts, ${this.balanceLogs.size} balance logs`);
+    this.setupPeriodicSnapshot();
+    this.setupShutdownHook();
   }
 
   private async save(): Promise<void> {
@@ -71,6 +109,73 @@ export class AccountRepository {
     const tmpPath = join(this.dataDir, `accounts-tmp-${Date.now()}.json`);
     await writeFile(tmpPath, JSON.stringify(dump, null, 2), 'utf-8');
     await rename(tmpPath, this.filePath);
+  }
+
+  /** Snapshot: saves latest + creates a timestamped copy, then rotates old ones */
+  private async snapshot(): Promise<void> {
+    try {
+      await this.save();
+
+      const iso = new Date().toISOString().replace(/[:.]/g, '-');
+      const snapPath = join(this.dataDir, `accounts-${iso}.json`);
+      const dump: AccountDumpFile = {
+        schemaVersion: 1,
+        savedAt: new Date().toISOString(),
+        accounts: Array.from(this.accounts.values()),
+        balanceLogs: Array.from(this.balanceLogs.values()),
+      };
+      await writeFile(snapPath, JSON.stringify(dump, null, 2), 'utf-8');
+      await this.rotate();
+    } catch (err) {
+      console.error('Account snapshot failed:', err);
+    }
+  }
+
+  /** Keep only the N most recent snapshot files */
+  private async rotate(): Promise<void> {
+    try {
+      const files = await readdir(this.dataDir);
+      const snapFiles = files
+        .filter(f => f.startsWith('accounts-') && f.endsWith('.json') && f !== 'accounts.json')
+        .sort()
+        .reverse();
+
+      if (snapFiles.length > this.keepSnapshots) {
+        const toRemove = snapFiles.slice(this.keepSnapshots);
+        for (const file of toRemove) {
+          await unlink(join(this.dataDir, file));
+        }
+      }
+    } catch {
+      // ignore cleanup errors
+    }
+  }
+
+  private setupPeriodicSnapshot(): void {
+    this.snapshotTimer = setInterval(() => {
+      this.snapshot().catch(err => console.error('Periodic account snapshot error:', err));
+    }, this.snapshotIntervalMs);
+  }
+
+  private setupShutdownHook(): void {
+    const shutdown = async () => {
+      if (this.shuttingDown) return;
+      this.shuttingDown = true;
+      console.log('Shutting down, saving accounts...');
+      if (this.snapshotTimer) {
+        clearInterval(this.snapshotTimer);
+        this.snapshotTimer = null;
+      }
+      try {
+        await this.save();
+        console.log('Final accounts save complete.');
+      } catch (err) {
+        console.error('Final accounts save failed:', err);
+      }
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
   }
 
   private isValidDump(dump: unknown): dump is AccountDumpFile {
@@ -118,7 +223,6 @@ export class AccountRepository {
     const existing = this.accounts.get(id);
     if (!existing) throw new NotFoundError(`Account ${id} not found`);
 
-    // Clone only mutable fields
     const updated: Account = {
       id: existing.id,
       name: patch.name ?? existing.name,
