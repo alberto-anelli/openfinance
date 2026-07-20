@@ -2,7 +2,8 @@
 
 ## 1. Scopo e contesto
 Applicazione web **personale, single-user, senza autenticazione** per la gestione di
-entrate e uscite mensili, con riepiloghi mensili e annuali.
+entrate e uscite mensili, con riepiloghi mensili e annuali, gestione di conti/patrimonio
+e associazione di ogni transazione a un conto.
 
 - **Stack:** SvelteKit (frontend statico) + micro-servizio Node di persistenza.
 - **Valuta:** EUR, formattazione locale `it-IT` (es. `1.234,56 €`).
@@ -21,44 +22,79 @@ Web server esistente (Nginx/Apache)
   └── reverse proxy:  /content/finance/api/**    → http://127.0.0.1:PORT/api/**
         ▼
 Servizio Node "finance-api" (systemd)
-  └── Repository (interfaccia) → InMemoryRepository (dump/restore su filesystem)
+  ├── Repository (interfaccia) → InMemoryRepository (dump/restore su filesystem)
+  └── AccountRepository (persistenza conti + saldi su filesystem)
 ```
 
 **Vincoli chiave:**
 - Il frontend è un **artefatto statico** copiato sotto `/var/www/html/content/finance/`, con entry point `app.html`.
 - La persistenza vive in un **processo Node persistente** separato, esposto sotto `/content/finance/api/` via reverse proxy.
-- Il database è **disaccoppiato dietro un'interfaccia**: l'implementazione attuale è in-memory con dump su file, sostituibile in futuro senza toccare la logica applicativa.
+- I database (transazioni e conti) sono **disaccoppiati dietro interfacce** separate, sostituibili in futuro senza toccare la logica applicativa.
 
 ---
 
 ## 3. Modello dati
+
+### 3.1 Transaction (entrate/uscite)
 
 ```ts
 export interface Transaction {
   id: string;            // uuid v4
   type: 'expense' | 'income';
   amount: number;        // interi in CENTESIMI (>0) — evitare float
-  category: string;      // libera (expense) | enum (income)
+  category: string;      // libera, free-text (sia expense che income)
+  description?: string;  // opzionale, solo expense
   date: string;          // 'YYYY-MM-DD'
   createdAt: string;     // ISO datetime
+  accountId?: string;    // riferimento a un conto (opzionale)
 }
 ```
 
-### 3.1 Regole di validazione
+### 3.2 Account (conti)
+
+```ts
+export type AccountType = string;  // free-text, es. "Conto Corrente", "Contanti", "Carta"
+
+export interface Account {
+  id: string;
+  name: string;
+  type: AccountType;     // libero, con suggerimenti da tipi già usati
+  currency: string;      // default "EUR"
+  color: string;         // hex #RRGGBB per identificazione visiva
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AccountBalanceLog {
+  id: string;
+  accountId: string;
+  balance: number;       // centesimi
+  date: string;          // YYYY-MM-DD
+  note?: string;
+  createdAt: string;
+}
+```
+
+### 3.3 Regole di validazione
+
 | Campo | Regola |
 |---|---|
 | `amount` | numero > 0, salvato in **centesimi** (intero) |
-| `date` (expense) | default oggi; ammesse **oggi e date future** |
-| `date` (income) | default oggi; ammesse **oggi e date future** |
-| `category` (expense) | stringa libera, `trim`, 1–60 caratteri |
-| `category` (income) | enum: `stipendio` \| `tredicesima` \| `quattordicesima` \| `regalo` |
+| `date` | default oggi; ammesse **oggi e date future** |
+| `category` | stringa libera, `trim`, 1–60 caratteri (sia expense che income) |
 | `type` | `expense` \| `income` |
+| `accountId` | opzionale, uuid v4 di un conto esistente |
+| `name` (account) | stringa non vuota |
+| `type` (account) | stringa non vuota, libera (nessun enum) |
+| `color` (account) | hex #RRGGBB, validato |
 
-> Nota implementativa: input/output API usano l'importo in **centesimi**; la formattazione `€` è responsabilità del frontend.
+> Nota: la categoria income non è più un enum. Sia expense che income usano testo libero con suggerimenti.
 
 ---
 
 ## 4. Repository (disaccoppiamento DB)
+
+### 4.1 Transaction Repository
 
 Le route/API dipendono **solo** dall'interfaccia, ottenuta via factory/singleton.
 
@@ -67,12 +103,18 @@ export interface Repository {
   add(tx: Omit<Transaction,'id'|'createdAt'>): Promise<Transaction>;
   update(id: string, patch: Partial<Transaction>): Promise<Transaction>;
   delete(id: string): Promise<void>;
-  list(filter?: { year?: number; month?: number; type?: Transaction['type']; category?: string }): Promise<Transaction[]>;
+  list(filter?: {
+    year?: number;
+    month?: number;
+    type?: Transaction['type'];
+    category?: string;
+    accountId?: string;
+  }): Promise<Transaction[]>;
   getById(id: string): Promise<Transaction | null>;
 }
 ```
 
-### 4.1 `InMemoryRepository` — persistenza
+### 4.2 `InMemoryRepository` — persistenza transazioni
 - Dati in `Map<string, Transaction>`.
 - **Write-through:** ogni `add/update/delete` innesca una scrittura su file, con **debounce ~1s** per raggruppare scritture ravvicinate.
 - **Snapshot periodico:** timer ogni **4h** che salva un dump completo.
@@ -80,7 +122,14 @@ export interface Repository {
 - **Restore all'avvio:** carica `dump-latest.json`; se corrotto, fallback all'ultimo `dump-<ts>.json` valido; se nessuno, parte vuoto.
 - **Graceful shutdown:** su `SIGINT`/`SIGTERM` esegue un dump sincrono finale.
 
-### 4.2 Formato dump
+### 4.3 `AccountRepository` — persistenza conti e saldi
+- Dati in `Map<string, Account>` + `Map<string, AccountBalanceLog>`.
+- **Write-through:** ogni operazione salva su file.
+- **Snapshot periodico:** timer ogni **4h** con rotazione.
+- **File:** `accounts.json` (dump) + `accounts-<ISO>.json` (snapshot ruotati).
+- **Cascata:** eliminando un conto vengono rimossi automaticamente tutti i suoi saldi.
+
+### 4.4 Formato dump transazioni
 ```json
 { "schemaVersion": 1, "savedAt": "2026-07-18T10:00:00Z", "transactions": [ /* Transaction[] */ ] }
 ```
@@ -88,20 +137,55 @@ export interface Repository {
 - Rotazione: `dump-<ISO>.json`, mantenere ultimi `FINANCE_DUMP_KEEP` (default 10).
 - Cartella: `FINANCE_DATA_DIR`.
 
+### 4.5 Formato dump conti
+```json
+{ "schemaVersion": 1, "savedAt": "2026-07-20T10:00:00Z", "accounts": [ /* Account[] */ ], "balanceLogs": [ /* AccountBalanceLog[] */ ] }
+```
+- File principale: `accounts.json`.
+- Stessa cartella: `FINANCE_DATA_DIR`.
+
 ---
 
 ## 5. API REST (servizio Node)
 Base path proxato: `/content/finance/api`. Risposte JSON.
 
+### 5.1 Transazioni
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
-| `POST`   | `/transactions` | crea (body con `type`) |
-| `GET`    | `/transactions?year=&month=&type=&category=` | lista filtrata |
+| `POST`   | `/transactions` | crea (body con `type`, `accountId` opzionale) |
+| `GET`    | `/transactions?year=&month=&type=&category=&accountId=` | lista filtrata |
 | `GET`    | `/transactions/:id` | dettaglio |
-| `PATCH`  | `/transactions/:id` | modifica (opzionale / nice-to-have) |
+| `PATCH`  | `/transactions/:id` | modifica (anche `accountId`) |
 | `DELETE` | `/transactions/:id` | elimina |
+
+### 5.2 Riepiloghi
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
 | `GET`    | `/summary/month?year=&month=` | totali mese + differenza |
 | `GET`    | `/summary/year?year=` | totali per ciascun mese + gap + totale annuo |
+
+### 5.3 Conti
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
+| `GET`    | `/accounts` | lista conti |
+| `GET`    | `/accounts/types` | tipi di conto distinti usati (per suggerimenti UI) |
+| `GET`    | `/accounts/wealth` | conti con saldo più recente (`latestBalance`) |
+| `POST`   | `/accounts` | crea conto (body: `name`, `type`, `color`) |
+| `GET`    | `/accounts/:id` | dettaglio conto |
+| `PATCH`  | `/accounts/:id` | modifica conto |
+| `DELETE` | `/accounts/:id` | elimina conto (cascata: rimuove anche saldi) |
+
+### 5.4 Saldi
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
+| `GET`    | `/accounts/:id/balances` | storico saldi di un conto |
+| `POST`   | `/accounts/:id/balances` | registra saldo (body: `balance`, `date`, `note?`) |
+| `PATCH`  | `/balances/:id` | modifica registrazione saldo |
+| `DELETE` | `/balances/:id` | elimina registrazione saldo |
+
+### 5.5 Health
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
 | `GET`    | `/health` | liveness probe |
 
 **Errori:** `{ "error": { "code": string, "message": string } }` con status HTTP coerente (400 validazione, 404 not found, 500 interno).
@@ -111,23 +195,37 @@ Base path proxato: `/content/finance/api`. Risposte JSON.
 ## 6. Funzionalità e pagine (UI)
 
 ### 6.1 `/add-notes` — Aggiungi spesa
-- Campi: `importo` (numerico, formattazione €), `categoria` (testo libero **+ suggerimenti** via `datalist` dalle categorie già usate), `data` (default oggi, future ammesse).
+- Campi: `importo` (numerico, formattazione €), `categoria` (testo libero **+ suggerimenti** via tag buttons dalle categorie già usate), `conto` (select opzionale dai conti esistenti), `data` (default oggi, future ammesse).
 - Validazione inline, toast di successo, reset o redirect a `/month`.
 
 ### 6.2 `/add-entry` — Aggiungi entrata
-- Campi: `importo`, `categoria` (**select**: Stipendio, Tredicesima, Quattordicesima, Regalo), `data` (default oggi, future ammesse).
+- Campi: `importo`, `categoria` (testo libero, non più enum), `conto` (select opzionale dai conti esistenti), `data` (default oggi, future ammesse).
 - Stessa UX di conferma.
 
-### 6.3 `/month` — Riepilogo
+### 6.3 `/month` — Riepilogo mensile
 Struttura verticale:
 1. **Selettore mese/anno** con frecce ◀ ▶ (default: mese corrente).
-2. **Filtro per categoria** (chips / multi-select) applicato alla lista del mese.
-3. **Lista voci del mese** (entrate + uscite): importo, categoria, data, colore semantico, azione **elimina**.
+2. **Filtro per categoria** (chips) applicato alla lista del mese.
+3. **Lista voci del mese** (entrate + uscite): importo, categoria, data, **conto associato**, colore semantico, azioni **modifica** ed **elimina**.
 4. **Riepilogo mese (in fondo):** Totale entrate | Totale uscite | **Differenza** (positiva/negativa evidenziata).
 5. **Riepilogo anno (compatto):** totale entrate e totale uscite dell'anno corrente sui dati inseriti.
 6. **Tabella annuale espandibile** (accordion): una riga per mese con `Entrate | Uscite | Gap`, più riga totale.
 
-### 6.4 Palette e stile
+### 6.4 `/app` — Dashboard (Panoramica)
+- **Anno navigabile** con input numerico e frecce ◀ ▶.
+- **Statistiche annuali:** entrate, uscite, saldo (differenza).
+- **Patrimonio Netto:** totale dei saldi di tutti i conti, con ripartizione per tipo di conto.
+- **Grafico a barre mensile** (entrate blu / uscite arancione) — cliccando una barra si scende nel dettaglio mese.
+- **Dettaglio mese:** categorie entrate/uscite con barre proporzionali, lista transazioni con **conto associato**.
+
+### 6.5 `/app/account` — Gestione Conti
+- **Elenco conti** a griglia con saldo corrente, tipo, colore identificativo.
+- **Dettaglio conto:** saldo attuale, grafico evoluzione saldo, variazioni mensili, storico registrazioni.
+- **CRUD conti** via modale: nome, tipo (testo libero **+ suggerimenti** da tipi già usati), colore.
+- **CRUD saldi** via modale: data, saldo in centesimi, nota opzionale.
+- **Sezione Patrimonio:** totale netto, ripartizione per tipo, barra impilata.
+
+### 6.6 Palette e stile
 | Ruolo | Colore | Uso |
 |---|---|---|
 | Primario | **Blu** (`--blue-100…900`) | header, azioni primarie, **entrate** |
@@ -145,7 +243,7 @@ Struttura verticale:
 | Variabile | Default | Uso |
 |---|---|---|
 | `FINANCE_PORT` | `3900` | porta servizio Node |
-| `FINANCE_DATA_DIR` | `/var/lib/finance` | cartella dump |
+| `FINANCE_DATA_DIR` | `/var/lib/finance` | cartella dump (transazioni + conti) |
 | `FINANCE_DUMP_INTERVAL_MS` | `14400000` | snapshot ogni 4h |
 | `FINANCE_DUMP_KEEP` | `10` | file di rotazione |
 | `PUBLIC_API_BASE` | `/content/finance/api` | base path API lato frontend |
@@ -242,11 +340,19 @@ sudo systemctl enable --now finance-api
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
+### 8.7 Deploy incrementale backend
+```bash
+# Ricostruire e copiare il backend dopo modifiche
+cd backend && npm run build && cd ..
+sudo cp -r backend/build/* /opt/finance-api/build/
+sudo systemctl restart finance-api
+```
+
 ---
 
 ## 9. Requisiti non funzionali
 - **Idempotenza deploy:** rieseguibile senza corrompere i dati.
-- **Backup/restore:** i file in `FINANCE_DATA_DIR` sono il punto di backup. Restore manuale: copiare un `dump-<ts>.json` su `dump-latest.json` e riavviare il servizio.
+- **Backup/restore:** i file in `FINANCE_DATA_DIR` sono il punto di backup. Includono `dump-latest.json` (transazioni) e `accounts.json` (conti+saldi). Restore manuale: copiare i file precedenti e riavviare il servizio.
 - **Log:** stdout/stderr → journald.
 - **Robustezza:** dump con scrittura atomica; restore con fallback su dump precedente se corrotto.
 - **Test minimi:** unit su `InMemoryRepository` (dump/restore, calcolo summary) e sulla validazione input.
@@ -258,18 +364,35 @@ sudo nginx -t && sudo systemctl reload nginx
 finance/
 ├─ src/
 │  ├─ routes/
-│  │  ├─ add-notes/     (+page.svelte)
-│  │  ├─ add-entry/     (+page.svelte)
-│  │  ├─ month/         (+page.svelte)
+│  │  ├─ add-notes/        (+page.svelte)     — aggiungi spesa
+│  │  ├─ add-entry/        (+page.svelte)     — aggiungi entrata
+│  │  ├─ month/            (+page.svelte)     — riepilogo mensile
+│  │  ├─ app/
+│  │  │  ├─ +page.svelte                      — dashboard / panoramica
+│  │  │  └─ account/
+│  │  │     └─ +page.svelte                   — gestione conti e patrimonio
 │  │  └─ +layout.svelte
 │  ├─ lib/
-│  │  ├─ components/     (Button, AmountInput, DatePicker, Card, SummaryTable...)
+│  │  ├─ components/        (Button, AmountInput, DatePicker, Card, SummaryTable, Toast...)
 │  │  ├─ theme.css
-│  │  ├─ api/            (client fetch → PUBLIC_API_BASE)
-│  │  └─ server/repository/
-│  │     ├─ Repository.ts
-│  │     ├─ InMemoryRepository.ts
-│  │     └─ dump.ts
+│  │  ├─ api/
+│  │  │  └─ client.ts                          — client fetch verso API
+│  │  └─ base.ts                               — rilevamento base path dinamico
+├─ backend/
+│  ├─ src/
+│  │  ├─ index.ts                              — entry point Express
+│  │  ├─ types.ts                              — modelli dati condivisi
+│  │  ├─ validation.ts                         — validazione input
+│  │  ├─ Repository.ts                         — interfaccia transazioni
+│  │  ├─ InMemoryRepository.ts                 — implementazione transazioni
+│  │  ├─ AccountRepository.ts                  — repository conti e saldi
+│  │  ├─ dump.ts                               — gestione dump/rotate transazioni
+│  │  └─ routes/
+│  │     ├─ transactions.ts                    — CRUD transazioni
+│  │     ├─ accounts.ts                        — CRUD conti, saldi, wealth, types
+│  │     ├─ summary.ts                         — riepiloghi mensili/annuali
+│  │     └─ health.ts                          — liveness probe
+│  └─ package.json
 ├─ scripts/deploy-frontend.sh
 ├─ svelte.config.js
 ├─ package.json
@@ -279,12 +402,13 @@ finance/
 ---
 
 ## 11. Criteri di accettazione
-- [ ] `/add-notes` crea una spesa con categoria libera e data (oggi/future).
-- [ ] `/add-entry` crea un'entrata con categoria da enum e data (oggi/future).
-- [ ] `/month` mostra lista mensile filtrabile per categoria, con differenza entrate/uscite.
+- [ ] `/add-notes` crea una spesa con categoria libera, conto opzionale e data (oggi/future).
+- [ ] `/add-entry` crea un'entrata con categoria libera (non più enum), conto opzionale.
+- [ ] `/month` mostra lista mensile filtrabile per categoria, con conto associato.
 - [ ] `/month` mostra totali annui compatti + tabella espandibile mese-per-mese con gap.
+- [ ] `/app` mostra dashboard annuale con grafico barre, patrimonio netto e drill-down mensile.
+- [ ] `/app/account` gestisce CRUD conti con tipo libero + suggerimenti, saldi, evoluzione.
 - [ ] Palette blu/arancione/grigio applicata con contrasto AA.
-- [ ] Dump automatico ogni 4h + write-through + restore all'avvio funzionanti.
-- [ ] `npm run build` produce l'output statico e lo copia in `/var/www/html/content/finance/` con entry point `app.html`.
-- [ ] Il repository è dietro interfaccia e sostituibile senza modificare le route.
-
+- [ ] Dump automatico transazioni e conti ogni 4h + write-through + restore all'avvio.
+- [ ] `npm run build` produce l'output statico e lo copia in `/var/www/html/content/finance/`.
+- [ ] I repository sono dietro interfacce e sostituibili senza modificare le route.

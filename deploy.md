@@ -189,6 +189,14 @@ sudo systemctl start finance-api
 
 ## 7. Manutenzione
 
+### Deploy incrementale backend
+```bash
+# Ricostruire e copiare il backend dopo modifiche
+cd /home/alberto/repo/llm/openfinance/backend && npm run build && cd ..
+sudo cp -r backend/build/* /opt/finance-api/build/
+sudo systemctl restart finance-api
+```
+
 ### Idempotenza
 Il deploy è rieseguibile senza corrompere i dati: lo script `deploy-frontend.sh` aggiorna solo i file statici, mentre i dump persistono in `FINANCE_DATA_DIR`.
 
