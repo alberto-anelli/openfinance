@@ -15,6 +15,8 @@
   .card {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
   }
   .card-income {
     border-left: 3px solid var(--color-income);

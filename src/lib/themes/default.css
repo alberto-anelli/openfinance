@@ -1,0 +1,103 @@
+/* ============================================================
+   Bilancio — Default Clean Light Theme
+   Palette: slate, blue, amber, orange
+   ============================================================ */
+
+.theme-default {
+  /* --- Grey / Slate scale --- */
+  --grey-950: #0f172a;
+  --grey-900: #1e293b;
+  --grey-850: #334155;
+  --grey-800: #475569;
+  --grey-750: #64748b;
+  --grey-700: #94a3b8;
+  --grey-600: #cbd5e1;
+  --grey-500: #e2e8f0;
+  --grey-400: #f1f5f9;
+  --grey-300: #f8fafc;
+  --grey-200: #f8fafc;
+  --grey-100: #ffffff;
+
+  /* --- Orange (expenses, accent) --- */
+  --orange-700: #c2410c;
+  --orange-600: #ea580c;
+  --orange-500: #f97316;
+  --orange-400: #fb923c;
+  --orange-300: #fdba74;
+  --orange-200: #fed7aa;
+
+  /* --- Blue (income, secondary accent) --- */
+  --blue-700: #1d4ed8;
+  --blue-600: #2563eb;
+  --blue-500: #3b82f6;
+  --blue-400: #60a5fa;
+  --blue-300: #93c5fd;
+  --blue-200: #bfdbfe;
+
+  /* --- Semantic aliases --- */
+  --color-income:         var(--blue-600);
+  --color-income-bg:      #eff6ff;
+  --color-income-dim:     rgba(37, 99, 235, 0.08);
+  --color-expense:        var(--orange-600);
+  --color-expense-bg:     #fff7ed;
+  --color-expense-dim:    rgba(234, 88, 12, 0.08);
+  --color-positive:       #16a34a;
+  --color-negative:       #dc2626;
+  --color-text:           var(--grey-950);
+  --color-text-secondary: var(--grey-750);
+  --color-text-dim:       var(--grey-600);
+  --color-bg:             #f8fafc;
+  --color-surface:        #ffffff;
+  --color-surface-raised: #f1f5f9;
+  --color-border:         #e2e8f0;
+  --color-border-light:   #cbd5e1;
+  --color-primary:        var(--blue-600);
+  --color-primary-hover:  var(--blue-700);
+  --color-accent:         var(--blue-500);
+  --color-accent-hover:   var(--blue-400);
+
+  /* --- Spacing --- */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+
+  /* --- Typography --- */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'IBM Plex Mono', ui-monospace, monospace;
+  --font-body: var(--font-sans);
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+
+  /* --- Border radius — rounded, modern --- */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* --- Shadows — subtle, layered --- */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 12px 24px -6px rgb(0 0 0 / 0.08), 0 4px 8px -4px rgb(0 0 0 / 0.04);
+  --shadow-xl: 0 20px 40px -8px rgb(0 0 0 / 0.1);
+}
+
+/* --- Default theme hides terminal decorations --- */
+.theme-default .btn-bracket {
+  display: none;
+}
+
+.theme-default .prompt-prefix {
+  display: none;
+}
+
+.theme-default .prompt-prefix + .input {
+  padding-left: 0.5rem;
+}

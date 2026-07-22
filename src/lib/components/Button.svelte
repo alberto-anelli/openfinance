@@ -33,8 +33,9 @@
     font-size: var(--text-xs);
     font-weight: 500;
     line-height: 1.25;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     border: 1px solid transparent;
+    border-radius: var(--radius-md);
     cursor: pointer;
     transition: background 0.1s, color 0.1s, border-color 0.1s;
     white-space: nowrap;

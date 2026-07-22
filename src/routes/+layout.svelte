@@ -1,6 +1,8 @@
 <script lang="ts">
   import '../lib/theme.css';
   import { getBasePath } from '$lib/base';
+  import { theme } from '$lib/themes/theme.svelte';
+  import Logo from '$lib/components/Logo.svelte';
   let base = $derived(getBasePath());
   let { children }: { children?: import('svelte').Snippet } = $props();
 
@@ -8,14 +10,16 @@
   let activeRoute = $derived(
     typeof window !== 'undefined' ? window.location.pathname : ''
   );
+
+  // Sync theme class on <html> and persist on change
+  $effect(() => {
+    const current = $theme;
+    document.documentElement.className = 'theme-' + current;
+  });
 </script>
 
 <header class="header">
-  <a href={base + '/app'} class="logo">
-    <span class="logo-bracket">[</span>
-    <span class="logo-text">Bilancio</span>
-    <span class="logo-bracket">]</span>
-  </a>
+  <Logo />
   <nav class="nav">
     <a href={base + '/add-notes'} class="nav-link">
       <span class="nav-arrow">&#x25BC;</span>
@@ -37,6 +41,13 @@
       <span class="nav-dot">&#x25CB;</span>
       <span>Mese</span>
     </a>
+    <button class="theme-toggle" onclick={() => theme.toggle()} title="Cambia tema">
+      {#if $theme === 'terminal'}
+        <span class="theme-icon">&#x25D0;</span>
+      {:else}
+        <span class="theme-icon">&#x25D1;</span>
+      {/if}
+    </button>
   </nav>
 </header>
 
@@ -57,30 +68,6 @@
     z-index: 100;
   }
 
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 0;
-    text-decoration: none;
-    font-family: var(--font-mono);
-  }
-  .logo:hover {
-    opacity: 0.8;
-    text-decoration: none;
-  }
-  .logo-bracket {
-    color: var(--color-primary);
-    font-weight: 700;
-    font-size: var(--text-lg);
-  }
-  .logo-text {
-    font-size: var(--text-base);
-    font-weight: 700;
-    color: var(--color-text);
-    letter-spacing: 0;
-    padding: 0 0.15rem;
-  }
-
   .nav {
     display: flex;
     gap: 1px;
@@ -91,7 +78,7 @@
     gap: 0.25rem;
     padding: 0.375rem 0.6rem;
     font-size: var(--text-xs);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     color: var(--color-text-secondary);
     border: 1px solid transparent;
     text-decoration: none;
@@ -110,6 +97,32 @@
   .nav-arrow, .nav-dot {
     font-size: 9px;
     flex-shrink: 0;
+  }
+
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    margin-left: 0.5rem;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
+    padding: 0;
+    line-height: 1;
+  }
+  .theme-toggle:hover {
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    border-color: var(--color-text-secondary);
+  }
+  .theme-icon {
+    display: block;
+    line-height: 1;
   }
 
   .main {

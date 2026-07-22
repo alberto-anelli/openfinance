@@ -189,12 +189,12 @@
     justify-content: space-between;
     margin-bottom: var(--space-lg);
   }
-  .page-header h1 { font-family: var(--font-mono); }
+  .page-header h1 { font-family: var(--font-body); }
   .loading-text {
     text-align: center;
     padding: var(--space-2xl);
     color: var(--color-text-secondary);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .form-fields {
     display: flex;
@@ -210,7 +210,7 @@
     font-size: var(--text-xs);
     font-weight: 500;
     color: var(--color-text-secondary);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .optional {
     font-weight: 400;
@@ -221,13 +221,14 @@
     padding: 0.5rem 0.5rem;
     font-size: var(--text-sm);
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
     background: var(--color-bg);
     color: var(--color-text);
     transition: border-color 0.1s;
     outline: none;
     width: 100%;
     cursor: pointer;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .select:focus {
     border-color: var(--color-primary);
@@ -238,7 +239,7 @@
     background: var(--color-expense-bg);
     color: var(--color-negative);
     font-size: var(--text-xs);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .form-actions {
     display: flex;

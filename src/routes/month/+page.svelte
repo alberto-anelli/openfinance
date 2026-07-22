@@ -328,7 +328,7 @@
   .month-title {
     min-width: 12rem;
     text-align: center;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
 
   .loading {
@@ -336,7 +336,7 @@
     padding: var(--space-2xl);
     color: var(--color-text-secondary);
   }
-  .loading-text { font-family: var(--font-mono); }
+  .loading-text { font-family: var(--font-body); }
 
   .filter-chips {
     display: flex;
@@ -353,7 +353,7 @@
     color: var(--color-text-secondary);
     cursor: pointer;
     transition: all 0.1s;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .chip:hover {
     border-color: var(--color-primary);
@@ -392,15 +392,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .tx-date {
     font-size: 10px;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .tx-account {
     font-size: 10px;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .tx-amount-group {
     display: flex;
@@ -409,7 +409,7 @@
     flex-shrink: 0;
   }
   .tx-amount {
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-weight: 600;
     font-size: var(--text-xs);
     white-space: nowrap;
@@ -421,7 +421,7 @@
     cursor: pointer;
     font-size: 10px;
     padding: 0.125rem 0.25rem;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     transition: color 0.1s, border-color 0.1s;
   }
   .tx-btn:hover {
@@ -450,13 +450,13 @@
     font-size: var(--text-xs);
     color: var(--color-text-secondary);
     line-height: 1.5;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
 
   .empty-state {
     text-align: center;
     font-size: var(--text-xs);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .empty-state a {
     color: var(--color-accent);
@@ -482,10 +482,10 @@
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .summary-value {
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-weight: 700;
     font-size: var(--text-sm);
   }
@@ -493,7 +493,7 @@
   .year-title {
     margin-bottom: var(--space-sm);
     font-size: var(--text-sm);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
 
   .accordion-toggle {
@@ -508,7 +508,7 @@
     color: var(--color-text);
     cursor: pointer;
     padding: 0;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .accordion-arrow {
     font-size: 10px;

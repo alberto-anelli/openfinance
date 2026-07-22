@@ -706,9 +706,10 @@
     font-weight: 700;
     text-align: center;
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
     background: var(--color-bg);
     color: var(--color-text);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     outline: none;
     transition: border-color 0.1s;
   }
@@ -746,7 +747,7 @@
     color: var(--color-text-secondary);
     cursor: pointer;
     transition: all 0.1s;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-size: var(--text-xs);
   }
   .subnav-btn:hover {
@@ -762,7 +763,7 @@
     background: var(--color-surface-raised);
     cursor: pointer;
     transition: background 0.1s;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .subnav-label:hover {
     background: var(--color-border);
@@ -780,7 +781,7 @@
     background: var(--color-surface);
     cursor: pointer;
     transition: all 0.1s;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .subnav-back:hover {
     border-color: var(--color-primary);
@@ -798,7 +799,7 @@
     font-size: var(--text-sm);
   }
   .loading-text {
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
 
   /* ── Summary stat cards ─────────────────────────────────────────────────── */
@@ -815,6 +816,7 @@
     padding: var(--space-md);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
     transition: border-color 0.1s;
   }
   .stat-card:hover {
@@ -841,10 +843,10 @@
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .stat-value {
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-weight: 700;
     font-size: var(--text-sm);
     overflow: hidden;
@@ -856,6 +858,7 @@
     padding: var(--space-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
     margin-bottom: var(--space-lg);
   }
 
@@ -873,18 +876,18 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: var(--space-xs);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .wealth-hero-amount {
     display: block;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-weight: 700;
     font-size: var(--text-xl);
     margin-bottom: var(--space-xs);
   }
   .wealth-hero-sub {
     font-size: var(--text-sm);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
 
   .wealth-stacked-bar {
@@ -917,23 +920,24 @@
     gap: var(--space-sm);
     font-size: var(--text-xs);
   }
-  .wealth-type-label { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+  .wealth-type-label { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-body); }
   .wealth-type-count {
     font-size: 10px;
     color: var(--color-text-secondary);
     text-align: center;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .wealth-type-bar-track { height: 12px; background: var(--color-border); overflow: hidden; }
   .wealth-type-bar-fill { height: 100%; transition: width 0.3s ease; min-width: 3px; background: var(--blue-500); }
-  .wealth-type-amount { font-family: var(--font-mono); font-weight: 600; text-align: right; font-size: var(--text-xs); }
-  .wealth-type-pct { font-family: var(--font-mono); color: var(--color-text-secondary); text-align: right; font-size: 10px; }
+  .wealth-type-amount { font-family: var(--font-body); font-weight: 600; text-align: right; font-size: var(--text-xs); }
+  .wealth-type-pct { font-family: var(--font-body); color: var(--color-text-secondary); text-align: right; font-size: 10px; }
 
   /* ── Chart card ─────────────────────────────────────────────────────────── */
   .chart-card {
     padding: var(--space-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
     margin-bottom: var(--space-md);
   }
   .chart-header {
@@ -947,13 +951,13 @@
   .section-title {
     font-size: var(--text-sm);
     font-weight: 600;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .section-subtitle {
     font-size: 10px;
     color: var(--color-text-secondary);
     margin-bottom: var(--space-md);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
 
   .chart-container {
@@ -971,7 +975,7 @@
     padding-bottom: 28px;
     font-size: 10px;
     color: var(--color-text-secondary);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     text-align: right;
     flex-shrink: 0;
   }
@@ -990,14 +994,14 @@
   .chart-label {
     font-size: 9px;
     fill: var(--color-text-secondary);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .chart-legend {
     display: flex;
     gap: var(--space-md);
     font-size: 10px;
     color: var(--color-text-secondary);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .legend-item {
     display: flex;
@@ -1015,7 +1019,7 @@
     margin-top: var(--space-sm);
     font-size: 10px;
     color: var(--color-text-dim);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     text-align: center;
   }
 
@@ -1034,11 +1038,12 @@
     padding: var(--space-2xl);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
     text-align: center;
   }
   .empty-symbol {
     color: var(--color-text-dim);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-size: var(--text-lg);
     margin-bottom: var(--space-sm);
   }
@@ -1046,11 +1051,11 @@
     font-size: var(--text-sm);
     font-weight: 600;
     color: var(--color-text);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .empty-sub {
     font-size: var(--text-xs);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
 
   /* ── Category breakdown ─────────────────────────────────────────────────── */
@@ -1058,6 +1063,7 @@
     padding: var(--space-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
     margin-bottom: var(--space-md);
   }
   .section-card-header {
@@ -1074,7 +1080,7 @@
     color: var(--color-text-secondary);
     padding: 0.125rem 0.4rem;
     background: var(--color-surface-raised);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
 
   .cat-chart {
@@ -1094,7 +1100,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .cat-bar-track {
     height: 18px;
@@ -1113,13 +1119,13 @@
     background: var(--color-income);
   }
   .cat-amount {
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-weight: 600;
     text-align: right;
     font-size: var(--text-xs);
   }
   .cat-pct {
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     color: var(--color-text-secondary);
     text-align: right;
     font-size: 10px;
@@ -1147,14 +1153,14 @@
   .tx-date {
     font-size: 10px;
     color: var(--color-text-secondary);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .tx-cat {
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .tx-desc {
     font-size: 10px;
@@ -1162,7 +1168,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--color-text-secondary);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .tx-desc-empty {
     /* empty cell for grid alignment */
@@ -1173,10 +1179,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .tx-amount {
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-weight: 600;
     text-align: right;
     font-size: var(--text-xs);

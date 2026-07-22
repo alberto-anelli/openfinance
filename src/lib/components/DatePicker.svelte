@@ -39,14 +39,15 @@
     font-size: var(--text-xs);
     font-weight: 500;
     color: var(--color-text-secondary);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
   }
   .input {
     width: 100%;
     padding: 0.5rem 0.5rem;
     font-size: var(--text-sm);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
     background: var(--color-bg);
     color: var(--color-text);
     transition: border-color 0.1s;

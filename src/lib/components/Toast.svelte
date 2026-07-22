@@ -38,7 +38,7 @@
     align-items: center;
     gap: var(--space-xs);
     padding: 0.5rem 0.75rem;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-size: var(--text-xs);
     z-index: 1000;
     max-width: 24rem;
@@ -68,7 +68,7 @@
     cursor: pointer;
     color: inherit;
     padding: 0 0.25rem;
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-size: var(--text-xs);
     opacity: 0.6;
     line-height: 1;
