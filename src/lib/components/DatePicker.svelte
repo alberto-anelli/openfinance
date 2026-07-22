@@ -36,24 +36,24 @@
     gap: var(--space-xs);
   }
   .label {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     font-weight: 500;
-    color: var(--color-text);
+    color: var(--color-text-secondary);
+    font-family: var(--font-body);
   }
   .input {
     width: 100%;
-    padding: 0.625rem 0.75rem;
-    font-size: var(--text-base);
-    font-family: var(--font-sans);
+    padding: 0.5rem 0.5rem;
+    font-size: var(--text-sm);
+    font-family: var(--font-body);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: var(--color-surface);
+    background: var(--color-bg);
     color: var(--color-text);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.1s;
     outline: none;
   }
   .input:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--blue-100);
   }
 </style>

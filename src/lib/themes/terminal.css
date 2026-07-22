@@ -1,0 +1,99 @@
+/* ============================================================
+   Bilancio — Terminal-Inspired Dark Theme
+   Palette: orange, blue, grey, white on black
+   ============================================================ */
+
+.theme-terminal {
+  /* --- Grey scale (terminal greys) --- */
+  --grey-950: #0a0a0b;
+  --grey-900: #141416;
+  --grey-850: #1a1a1e;
+  --grey-800: #222226;
+  --grey-750: #2a2a2e;
+  --grey-700: #333336;
+  --grey-600: #4a4a4e;
+  --grey-500: #6a6a6e;
+  --grey-400: #8a8a8e;
+  --grey-300: #a8a8ae;
+  --grey-200: #c8c8ce;
+  --grey-100: #e4e4e8;
+
+  /* --- Orange (primary, expenses, accent) --- */
+  --orange-700: #cc5500;
+  --orange-600: #dd6600;
+  --orange-500: #ff7700;
+  --orange-400: #ff9944;
+  --orange-300: #ffbb77;
+  --orange-200: #ffddaa;
+
+  /* --- Blue (income, secondary accent) --- */
+  --blue-700: #1a66cc;
+  --blue-600: #2277ee;
+  --blue-500: #3399ff;
+  --blue-400: #66bbff;
+  --blue-300: #99ccff;
+  --blue-200: #bbddff;
+
+  /* --- Semantic aliases --- */
+  --color-income:         var(--blue-500);
+  --color-income-bg:      rgba(51, 153, 255, 0.08);
+  --color-income-dim:     rgba(51, 153, 255, 0.12);
+  --color-expense:        var(--orange-500);
+  --color-expense-bg:     rgba(255, 119, 0, 0.08);
+  --color-expense-dim:    rgba(255, 119, 0, 0.12);
+  --color-positive:       var(--blue-500);
+  --color-negative:       var(--orange-500);
+  --color-text:           var(--grey-100);
+  --color-text-secondary: var(--grey-500);
+  --color-text-dim:       var(--grey-600);
+  --color-bg:             var(--grey-950);
+  --color-surface:        var(--grey-900);
+  --color-surface-raised: var(--grey-850);
+  --color-border:         var(--grey-800);
+  --color-border-light:   var(--grey-750);
+  --color-primary:        var(--orange-500);
+  --color-primary-hover:  var(--orange-400);
+  --color-accent:         var(--blue-500);
+  --color-accent-hover:   var(--blue-400);
+
+  /* --- Spacing --- */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+
+  /* --- Typography — monospace first --- */
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'IBM Plex Mono', ui-monospace, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: var(--font-mono);
+  --text-xs: 0.7rem;
+  --text-sm: 0.8rem;
+  --text-base: 0.9rem;
+  --text-lg: 1rem;
+  --text-xl: 1.15rem;
+  --text-2xl: 1.35rem;
+
+  /* --- Border radius — flat terminal --- */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-full: 0;
+
+  /* --- No shadows — terminal flat --- */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+}
+
+/* --- Terminal-specific decorative elements --- */
+.theme-terminal .btn-bracket {
+  display: inline;
+}
+
+.theme-terminal .prompt-prefix {
+  display: inline;
+}

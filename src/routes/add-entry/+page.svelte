@@ -109,7 +109,7 @@
 </script>
 
 <svelte:head>
-  <title>{editingId ? 'Modifica entrata' : 'Aggiungi entrata'} — Finanze</title>
+  <title>{editingId ? 'Modifica entrata' : 'Aggiungi entrata'} — Bilancio</title>
 </svelte:head>
 
 <div class="page-header">
@@ -189,10 +189,12 @@
     justify-content: space-between;
     margin-bottom: var(--space-lg);
   }
+  .page-header h1 { font-family: var(--font-body); }
   .loading-text {
     text-align: center;
     padding: var(--space-2xl);
     color: var(--color-text-secondary);
+    font-family: var(--font-body);
   }
   .form-fields {
     display: flex;
@@ -205,34 +207,39 @@
     gap: var(--space-xs);
   }
   .field-label {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     font-weight: 500;
-    color: var(--color-text);
+    color: var(--color-text-secondary);
+    font-family: var(--font-body);
+  }
+  .optional {
+    font-weight: 400;
+    color: var(--color-text-dim);
+    font-size: 10px;
   }
   .select {
-    padding: 0.625rem 0.75rem;
-    font-size: var(--text-base);
+    padding: 0.5rem 0.5rem;
+    font-size: var(--text-sm);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: var(--color-surface);
+    background: var(--color-bg);
     color: var(--color-text);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.1s;
     outline: none;
     width: 100%;
     cursor: pointer;
-    appearance: auto;
+    font-family: var(--font-body);
   }
   .select:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--blue-100);
   }
   .error {
     margin-top: var(--space-md);
-    padding: 0.5rem 0.75rem;
-    background: #fef2f2;
-    color: #991b1b;
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
+    padding: 0.4rem 0.5rem;
+    background: var(--color-expense-bg);
+    color: var(--color-negative);
+    font-size: var(--text-xs);
+    font-family: var(--font-body);
   }
   .form-actions {
     display: flex;

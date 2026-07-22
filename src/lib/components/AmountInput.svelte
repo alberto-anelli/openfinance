@@ -23,8 +23,6 @@
   let focused = $state(false);
 
   // Sync displayValue from the value prop when it changes externally
-  // (e.g. form reset, programmatic set).  Skip while the user is actively
-  // editing — handleBlur takes care of formatting then.
   $effect(() => {
     if (value !== previousValue) {
       previousValue = value;
@@ -61,7 +59,7 @@
     <label for={id} class="label">{label}</label>
   {/if}
   <div class="input-wrapper">
-    <span class="currency">€</span>
+    <span class="currency prompt-prefix">></span>
     <input
       {id}
       type="text"
@@ -85,9 +83,10 @@
     gap: var(--space-xs);
   }
   .label {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     font-weight: 500;
-    color: var(--color-text);
+    color: var(--color-text-secondary);
+    font-family: var(--font-body);
   }
   .input-wrapper {
     position: relative;
@@ -96,29 +95,29 @@
   }
   .currency {
     position: absolute;
-    left: 0.75rem;
-    color: var(--color-text-secondary);
-    font-weight: 500;
-    font-size: var(--text-base);
+    left: 0.5rem;
+    color: var(--color-primary);
+    font-weight: 700;
+    font-size: var(--text-sm);
     pointer-events: none;
+    font-family: var(--font-mono);
   }
   .input {
     width: 100%;
-    padding: 0.625rem 0.75rem 0.625rem 2rem;
-    font-size: var(--text-base);
-    font-family: var(--font-mono);
+    padding: 0.5rem 0.5rem 0.5rem 1.6rem;
+    font-size: var(--text-sm);
+    font-family: var(--font-body);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: var(--color-surface);
+    background: var(--color-bg);
     color: var(--color-text);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.1s;
     outline: none;
   }
   .input:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--blue-100);
   }
   .input::placeholder {
-    color: var(--gray-400);
+    color: var(--color-text-dim);
   }
 </style>

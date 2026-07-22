@@ -122,7 +122,7 @@
 </script>
 
 <svelte:head>
-  <title>{editingId ? 'Modifica spesa' : 'Aggiungi spesa'} — Finanze</title>
+  <title>{editingId ? 'Modifica spesa' : 'Aggiungi spesa'} — Bilancio</title>
 </svelte:head>
 
 <div class="page-header">
@@ -234,10 +234,12 @@
     justify-content: space-between;
     margin-bottom: var(--space-lg);
   }
+  .page-header h1 { font-family: var(--font-body); }
   .loading-text {
     text-align: center;
     padding: var(--space-2xl);
     color: var(--color-text-secondary);
+    font-family: var(--font-body);
   }
   .form-fields {
     display: flex;
@@ -250,47 +252,46 @@
     gap: var(--space-xs);
   }
   .field-label {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     font-weight: 500;
-    color: var(--color-text);
+    color: var(--color-text-secondary);
+    font-family: var(--font-body);
   }
   .optional {
     font-weight: 400;
-    color: var(--color-text-secondary);
-    font-size: var(--text-xs);
+    color: var(--color-text-dim);
+    font-size: 10px;
   }
   .input {
-    padding: 0.625rem 0.75rem;
-    font-size: var(--text-base);
+    padding: 0.5rem 0.5rem;
+    font-size: var(--text-sm);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: var(--color-surface);
+    background: var(--color-bg);
     color: var(--color-text);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.1s;
     outline: none;
     width: 100%;
+    font-family: var(--font-body);
   }
   .input:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--blue-100);
   }
   .select {
-    padding: 0.625rem 0.75rem;
-    font-size: var(--text-base);
+    padding: 0.5rem 0.5rem;
+    font-size: var(--text-sm);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: var(--color-surface);
+    background: var(--color-bg);
     color: var(--color-text);
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.1s;
     outline: none;
     width: 100%;
     cursor: pointer;
-    appearance: auto;
-    font-family: inherit;
+    font-family: var(--font-body);
   }
   .select:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--blue-100);
   }
   .category-tags {
     display: flex;
@@ -299,16 +300,16 @@
     margin-top: var(--space-xs);
   }
   .tag {
-    padding: 0.25rem 0.65rem;
-    font-size: var(--text-xs);
+    padding: 0.2rem 0.5rem;
+    font-size: 10px;
     font-weight: 500;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-sm);
     background: var(--color-surface);
     color: var(--color-text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
-    font-family: inherit;
+    transition: all 0.1s;
+    font-family: var(--font-body);
     line-height: 1.4;
   }
   .tag:hover {
@@ -317,19 +318,19 @@
   }
   .tag-active {
     background: var(--color-primary);
-    color: #fff;
+    color: var(--color-bg);
     border-color: var(--color-primary);
   }
   .tag-active:hover {
-    color: #fff;
+    color: var(--color-bg);
   }
   .error {
     margin-top: var(--space-md);
-    padding: 0.5rem 0.75rem;
-    background: #fef2f2;
-    color: #991b1b;
-    border-radius: var(--radius-md);
-    font-size: var(--text-sm);
+    padding: 0.4rem 0.5rem;
+    background: var(--color-expense-bg);
+    color: var(--color-negative);
+    font-size: var(--text-xs);
+    font-family: var(--font-body);
   }
   .form-actions {
     display: flex;

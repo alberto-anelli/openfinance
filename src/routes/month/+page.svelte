@@ -135,7 +135,7 @@
 </script>
 
 <svelte:head>
-  <title>Riepilogo — Finanze</title>
+  <title>Mese — Bilancio</title>
 </svelte:head>
 
 <!-- 1. Month selector -->
@@ -150,7 +150,7 @@
 <!-- Loading state -->
 {#if loading}
   <div class="loading">
-    <p>Caricamento...</p>
+    <p class="loading-text">Caricamento...</p>
   </div>
   <!-- Error state -->
 {:else if error}
@@ -208,18 +208,18 @@
                 {tx.type === 'income' ? '+' : '–'}{formatCents(tx.amount)}
               </span>
               <button
-                class="tx-edit"
+                class="tx-btn"
                 onclick={() => goto(editUrl(tx))}
                 aria-label="Modifica"
               >
-                ✎
+                [edit]
               </button>
               <button
-                class="tx-delete"
+                class="tx-btn tx-btn-del"
                 onclick={() => deleteTransaction(tx.id)}
                 aria-label="Elimina"
               >
-                ✕
+                [del]
               </button>
             </div>
           </div>
@@ -299,7 +299,7 @@
         onclick={() => showYearTable = !showYearTable}
       >
         <span>Dettaglio mensile</span>
-        <span class="accordion-arrow">{showYearTable ? '▲' : '▼'}</span>
+        <span class="accordion-arrow">{showYearTable ? '^' : 'v'}</span>
       </button>
       {#if showYearTable}
         <div class="accordion-content">
@@ -328,6 +328,7 @@
   .month-title {
     min-width: 12rem;
     text-align: center;
+    font-family: var(--font-body);
   }
 
   .loading {
@@ -335,6 +336,7 @@
     padding: var(--space-2xl);
     color: var(--color-text-secondary);
   }
+  .loading-text { font-family: var(--font-body); }
 
   .filter-chips {
     display: flex;
@@ -343,16 +345,15 @@
     margin-bottom: var(--space-md);
   }
   .chip {
-    padding: 0.25rem 0.75rem;
-    font-size: var(--text-xs);
+    padding: 0.2rem 0.6rem;
+    font-size: 10px;
     font-weight: 500;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-full);
     background: var(--color-surface);
     color: var(--color-text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
-    font-family: inherit;
+    transition: all 0.1s;
+    font-family: var(--font-body);
   }
   .chip:hover {
     border-color: var(--color-primary);
@@ -360,11 +361,11 @@
   }
   .chip-active {
     background: var(--color-primary);
-    color: #fff;
+    color: var(--color-bg);
     border-color: var(--color-primary);
   }
   .chip-active:hover {
-    color: #fff;
+    color: var(--color-bg);
   }
 
   .tx-list {
@@ -387,17 +388,19 @@
   }
   .tx-category {
     font-weight: 500;
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: var(--font-body);
   }
   .tx-date {
-    font-size: var(--text-xs);
+    font-size: 10px;
+    font-family: var(--font-body);
   }
   .tx-account {
-    font-size: var(--text-xs);
-    font-style: italic;
+    font-size: 10px;
+    font-family: var(--font-body);
   }
   .tx-amount-group {
     display: flex;
@@ -406,68 +409,57 @@
     flex-shrink: 0;
   }
   .tx-amount {
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-weight: 600;
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     white-space: nowrap;
   }
-  .tx-delete {
+  .tx-btn {
     background: none;
-    border: none;
+    border: 1px solid var(--color-border);
     color: var(--color-text-secondary);
     cursor: pointer;
-    font-size: var(--text-sm);
-    padding: 0.25rem;
-    border-radius: var(--radius-sm);
-    line-height: 1;
-    transition: color 0.15s, background 0.15s;
+    font-size: 10px;
+    padding: 0.125rem 0.25rem;
+    font-family: var(--font-body);
+    transition: color 0.1s, border-color 0.1s;
   }
-  .tx-delete:hover {
-    color: var(--color-negative);
-    background: #fef2f2;
-  }
-  .tx-edit {
-    background: none;
-    border: none;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    font-size: var(--text-sm);
-    padding: 0.25rem;
-    border-radius: var(--radius-sm);
-    line-height: 1;
-    transition: color 0.15s, background 0.15s;
-  }
-  .tx-edit:hover {
+  .tx-btn:hover {
     color: var(--color-primary);
-    background: var(--blue-50);
+    border-color: var(--color-primary);
+  }
+  .tx-btn-del:hover {
+    color: var(--color-negative);
+    border-color: var(--color-negative);
   }
   .tx-info-clickable {
     cursor: pointer;
-    border-radius: var(--radius-sm);
     padding: 0.125rem 0;
-    transition: background 0.15s;
+    transition: background 0.1s;
   }
   .tx-info-clickable:hover {
-    background: var(--gray-50);
+    background: var(--color-surface-raised);
   }
   :global(.tx-expanded) {
-    box-shadow: 0 0 0 1px var(--color-primary);
+    border-color: var(--color-primary) !important;
   }
   .tx-description {
     margin-top: var(--space-sm);
     padding-top: var(--space-sm);
     border-top: 1px solid var(--color-border);
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     color: var(--color-text-secondary);
     line-height: 1.5;
+    font-family: var(--font-body);
   }
 
   .empty-state {
     text-align: center;
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
+    font-family: var(--font-body);
   }
   .empty-state a {
-    color: var(--color-primary);
+    color: var(--color-accent);
   }
 
   :global(.summary-card), :global(.year-compact), :global(.year-table-section) {
@@ -485,21 +477,23 @@
     gap: 0.25rem;
   }
   .summary-label {
-    font-size: var(--text-xs);
+    font-size: 10px;
     font-weight: 500;
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    font-family: var(--font-body);
   }
   .summary-value {
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     font-weight: 700;
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
   }
 
   .year-title {
     margin-bottom: var(--space-sm);
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
+    font-family: var(--font-body);
   }
 
   .accordion-toggle {
@@ -509,15 +503,15 @@
     width: 100%;
     background: none;
     border: none;
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--color-text);
     cursor: pointer;
     padding: 0;
-    font-family: inherit;
+    font-family: var(--font-body);
   }
   .accordion-arrow {
-    font-size: var(--text-xs);
+    font-size: 10px;
     color: var(--color-text-secondary);
   }
   .accordion-content {
@@ -536,7 +530,7 @@
     }
     .month-title {
       min-width: 10rem;
-      font-size: var(--text-lg);
+      font-size: var(--text-base);
     }
   }
 </style>

@@ -55,17 +55,18 @@
   .summary-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
   }
   th, td {
-    padding: 0.5rem 0.75rem;
+    padding: 0.35rem 0.6rem;
     text-align: left;
     border-bottom: 1px solid var(--color-border);
   }
   th {
     font-weight: 600;
     color: var(--color-text-secondary);
-    font-size: var(--text-xs);
+    font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
@@ -80,11 +81,11 @@
   tfoot th {
     border-top: 2px solid var(--color-text);
     color: var(--color-text);
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     text-transform: none;
     letter-spacing: 0;
   }
   tr.empty td {
-    color: var(--color-text-secondary);
+    color: var(--color-text-dim);
   }
 </style>

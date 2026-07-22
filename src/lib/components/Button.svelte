@@ -14,7 +14,13 @@
   onclick={onclick}
   class="btn btn-{variant}"
 >
+  {#if variant === 'primary'}
+    <span class="btn-bracket">[</span>
+  {/if}
   {@render children?.()}
+  {#if variant === 'primary'}
+    <span class="btn-bracket">]</span>
+  {/if}
 </button>
 
 <style>
@@ -22,50 +28,57 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--space-sm);
-    padding: 0.5rem 1rem;
-    font-size: var(--text-sm);
+    gap: 0;
+    padding: 0.4rem 0.75rem;
+    font-size: var(--text-xs);
     font-weight: 500;
     line-height: 1.25;
+    font-family: var(--font-body);
     border: 1px solid transparent;
     border-radius: var(--radius-md);
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    transition: background 0.1s, color 0.1s, border-color 0.1s;
     white-space: nowrap;
-    font-family: inherit;
+    background: transparent;
+    letter-spacing: 0;
   }
   .btn:disabled {
-    opacity: 0.5;
+    opacity: 0.4;
     cursor: not-allowed;
   }
+  .btn-bracket {
+    color: currentColor;
+    opacity: 0.6;
+    padding: 0 0.1rem;
+  }
   .btn-primary {
-    background: var(--color-primary);
-    color: #fff;
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background: transparent;
   }
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-primary-hover);
+    background: var(--color-expense-bg);
   }
   .btn-secondary {
-    background: var(--color-surface);
-    color: var(--color-text);
+    color: var(--color-text-secondary);
     border-color: var(--color-border);
   }
   .btn-secondary:hover:not(:disabled) {
-    background: var(--gray-50);
+    border-color: var(--color-text-secondary);
+    color: var(--color-text);
   }
   .btn-danger {
-    background: var(--color-negative);
-    color: #fff;
+    color: var(--color-negative);
+    border-color: var(--color-negative);
   }
   .btn-danger:hover:not(:disabled) {
-    background: #b91c1c;
+    background: var(--color-expense-bg);
   }
   .btn-ghost {
-    background: transparent;
     color: var(--color-text-secondary);
+    border-color: transparent;
   }
   .btn-ghost:hover:not(:disabled) {
-    background: var(--gray-100);
     color: var(--color-text);
   }
 </style>
