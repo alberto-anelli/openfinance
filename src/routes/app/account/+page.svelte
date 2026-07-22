@@ -19,7 +19,7 @@
   let wealthHistory = $state<{ date: string; netWealth: number; accountCount: number }[]>([]);
   let wealthHistoryLoading = $state(false);
 
-  // Reconciliation data for selected account
+  // Reconciliation data
   let reconciliation = $state<{
     deltas: { fromDate: string; fromBalance: number; toDate: string; toBalance: number; delta: number; daysBetween: number }[];
     balanceLogCount: number;
@@ -38,7 +38,7 @@
   // Form state
   let formName = $state('');
   let formType = $state('');
-  let formColor = $state('#6366f1');
+  let formColor = $state('#ff7700');
   let formBalance = $state(0);
   let formDate = $state('');
   let formNote = $state('');
@@ -59,7 +59,6 @@
   interface TypeWealth {
     type: string;
     label: string;
-    icon: string;
     total: number;
     count: number;
     pct: number;
@@ -74,18 +73,9 @@
     other: 'Altro',
   };
 
-  const accountTypeIcons: Record<string, string> = {
-    bank: '🏦',
-    credit_card: '💳',
-    debit_card: '💳',
-    savings: '🐷',
-    cash: '💵',
-    other: '📦',
-  };
-
   const accountTypeColors: Record<string, string> = {
-    bank: '#2563eb',
-    credit_card: '#f97316',
+    bank: '#3399ff',
+    credit_card: '#ff7700',
     debit_card: '#14b8a6',
     savings: '#16a34a',
     cash: '#8b5cf6',
@@ -94,10 +84,6 @@
 
   function typeLabel(t: string): string {
     return accountTypeLabels[t] ?? t;
-  }
-
-  function typeIcon(t: string): string {
-    return accountTypeIcons[t] ?? '📁';
   }
 
   function typeColor(t: string): string {
@@ -123,7 +109,6 @@
       result.push({
         type,
         label: typeLabel(type),
-        icon: typeIcon(type),
         total: data.total,
         count: data.count,
         pct: totalNetWorth !== 0 ? data.total / totalNetWorth : 0,
@@ -137,7 +122,7 @@
     wealthByType.length > 0 ? Math.max(...wealthByType.map(w => Math.abs(w.total))) : 1
   );
 
-  // ── Wealth history derived ─────────────────────────────────────────────
+  // Wealth history derived
   let wealthHistorySorted = $derived(
     [...wealthHistory].sort((a, b) => a.date.localeCompare(b.date))
   );
@@ -150,7 +135,7 @@
   );
   let wealthRange = $derived(Math.max(1, wealthMax - wealthMin));
 
-  // Monthly deltas from balance logs — FIXED: cross-month deltas included
+  // Monthly deltas
   interface MonthDelta {
     year: number;
     month: number;
@@ -181,16 +166,9 @@
 
       const startBalance = monthLogs[0].balance;
       const endBalance = monthLogs[monthLogs.length - 1].balance;
-      // The delta is simply end - start (net change during the month)
       const delta = endBalance - startBalance;
 
-      deltas.push({
-        year,
-        month,
-        startBalance,
-        endBalance,
-        delta,
-      });
+      deltas.push({ year, month, startBalance, endBalance, delta });
     }
 
     return deltas;
@@ -202,7 +180,7 @@
       : 1
   );
 
-  // ── Reconciliation derived ─────────────────────────────────────────────
+  // Reconciliation derived
   let reconAvgDelta = $derived.by(() => {
     if (!reconciliation || reconciliation.deltas.length === 0) return null;
     const total = reconciliation.deltas.reduce((s, d) => s + d.delta, 0);
@@ -233,7 +211,6 @@
     error = '';
     try {
       accounts = await api.listAccounts();
-      // Load latest balance for every account
       const latestMap = new Map<string, number>();
       await Promise.all(accounts.map(async (acc) => {
         try {
@@ -254,7 +231,6 @@
         else balances = [];
       }
 
-      // Load wealth history
       loadWealthHistory();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Errore nel caricamento';
@@ -266,7 +242,6 @@
   async function loadBalances(accountId: string) {
     try {
       balances = await api.listBalances(accountId);
-      // Also load reconciliation for this account
       loadReconciliation(accountId);
     } catch {
       balances = [];
@@ -298,7 +273,6 @@
 
   onMount(loadAccounts);
 
-  // Load account type suggestions
   $effect(() => {
     api.accountTypes().then(types => {
       accountTypeSuggestions = types;
@@ -310,7 +284,7 @@
     editingAccount = null;
     formName = '';
     formType = '';
-    formColor = '#6366f1';
+    formColor = '#ff7700';
     showAccountModal = true;
   }
 
@@ -405,7 +379,6 @@
       }
       showBalanceModal = false;
       await loadBalances(selectedAccount.id);
-      // Refresh latest balances map
       const updatedBalances = await api.listBalances(selectedAccount.id);
       if (updatedBalances.length > 0) {
         const latest = updatedBalances.reduce((a, b) => a.date > b.date ? a : b);
@@ -428,7 +401,6 @@
       await api.deleteBalance(id);
       if (selectedAccountId) {
         await loadBalances(selectedAccountId);
-        // Refresh latest balances map
         const updatedBalances = await api.listBalances(selectedAccountId);
         const newMap = new Map(latestBalancesMap);
         if (updatedBalances.length > 0) {
@@ -448,12 +420,11 @@
 
   // ── Chart helpers ──────────────────────────────────────────────────────
   const CHART_W = 600;
-  const CHART_H = 200;
+  const CHART_H = 180;
   const CHART_PAD = 8;
 
-  // Wealth history chart dimensions
   const WH_CHART_W = 600;
-  const WH_CHART_H = 150;
+  const WH_CHART_H = 140;
   const WH_CHART_PAD = 6;
 
   function balanceLinePath(): string | null {
@@ -500,7 +471,6 @@
     return eur.toFixed(0) + '€';
   }
 
-  // Wealth history SVG path helpers
   function whAreaPathAcc(): string {
     if (wealthHistorySorted.length < 2) return '';
     const stepX = (WH_CHART_W - WH_CHART_PAD * 2) / Math.max(1, wealthHistorySorted.length - 1);
@@ -526,8 +496,7 @@
     }
     return d;
   }
-
-  </script>
+</script>
 
 <svelte:head>
   <title>Conti — Bilancio</title>
@@ -541,7 +510,7 @@
 
 <!-- ── Loading / Error ─────────────────────────────────────────────────── -->
 {#if loading}
-  <div class="loading"><div class="spinner"></div><p>Caricamento...</p></div>
+  <div class="loading"><p class="loading-text">Caricamento...</p></div>
 {:else if error}
   <div class="error-card">
     <p class="text-expense">{error}</p>
@@ -549,11 +518,7 @@
   </div>
 {:else if accounts.length === 0}
   <div class="empty-state">
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" class="empty-icon">
-      <rect x="8" y="16" width="32" height="24" rx="3" stroke="var(--slate-300)" stroke-width="2" fill="none" />
-      <path d="M8 22h32" stroke="var(--slate-300)" stroke-width="2" />
-      <circle cx="32" cy="30" r="4" fill="var(--slate-200)" />
-    </svg>
+    <p class="empty-symbol">~ ~ ~</p>
     <p class="empty-text">Nessun conto</p>
     <p class="empty-sub text-muted">Aggiungi un conto corrente, carta o salvadanaio</p>
     <Button onclick={openAddAccount}>Crea il primo conto</Button>
@@ -561,7 +526,7 @@
 {:else}
 
   <!-- ════════════════════════════════════════════════════════════════════ -->
-  <!-- WEALTH OVERVIEW — aggregate statistics across all accounts          -->
+  <!-- WEALTH OVERVIEW                                                      -->
   <!-- ════════════════════════════════════════════════════════════════════ -->
   <div class="wealth-section">
     <div class="wealth-hero">
@@ -587,7 +552,6 @@
         <div class="wealth-type-list">
           {#each wealthByType as w}
             <div class="wealth-type-row">
-              <span class="wealth-type-icon">{w.icon}</span>
               <span class="wealth-type-label">{w.label}</span>
               <span class="wealth-type-count">{w.count}</span>
               <div class="wealth-type-bar-track">
@@ -608,21 +572,15 @@
       <div class="wealth-chart-section">
         <h3 class="wealth-title">Evoluzione Patrimonio Netto</h3>
         <svg viewBox="0 0 {WH_CHART_W} {WH_CHART_H + 20}" class="line-chart">
-          <defs>
-            <linearGradient id="whAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="var(--color-primary)40" />
-              <stop offset="100%" stop-color="var(--color-primary)05" />
-            </linearGradient>
-          </defs>
           <!-- Area -->
-          <path d={whAreaPathAcc()} fill="url(#whAreaGrad)" />
+          <path d={whAreaPathAcc()} fill="var(--color-income-dim)" />
           <!-- Line -->
-          <path d={whLinePathAcc()} fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d={whLinePathAcc()} fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           <!-- Dots -->
           {#each wealthHistorySorted as w, i}
             {@const x = WH_CHART_PAD + i * whStepXAcc}
             {@const y = WH_CHART_PAD + ((wealthMax - w.netWealth) / wealthRange) * (WH_CHART_H - WH_CHART_PAD * 2)}
-            <circle cx={x} cy={y} r="3" fill="var(--color-primary)" stroke="#fff" stroke-width="1.5">
+            <circle cx={x} cy={y} r="2.5" fill="var(--color-accent)" stroke="var(--color-bg)" stroke-width="1">
               <title>{new Date(w.date + 'T00:00:00').toLocaleDateString('it-IT')}: {formatCents(w.netWealth)}</title>
             </circle>
           {/each}
@@ -644,7 +602,6 @@
         style="--accent-color: {acc.color}"
       >
         <div class="acct-top">
-          <span class="acct-icon">{typeIcon(acc.type)}</span>
           <span class="acct-type-badge">{typeLabel(acc.type)}</span>
         </div>
         <span class="acct-name">{acc.name}</span>
@@ -656,8 +613,8 @@
           {/if}
         </span>
         <div class="acct-actions">
-          <span class="acct-btn" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); openEditAccount(acc); }} onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); openEditAccount(acc); } }} aria-label="Modifica">✎</span>
-          <span class="acct-btn acct-btn-del" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); deleteAccount(acc); }} onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); deleteAccount(acc); } }} aria-label="Elimina">✕</span>
+          <span class="acct-btn" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); openEditAccount(acc); }} onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); openEditAccount(acc); } }} aria-label="Modifica">[edit]</span>
+          <span class="acct-btn acct-btn-del" role="button" tabindex="0" onclick={(e) => { e.stopPropagation(); deleteAccount(acc); }} onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); deleteAccount(acc); } }} aria-label="Elimina">[del]</span>
         </div>
       </div>
     {/each}
@@ -686,22 +643,16 @@
         <div class="chart-card">
           <h3 class="section-title">Evoluzione del Saldo</h3>
           <svg viewBox="0 0 {CHART_W} {CHART_H + 20}" class="line-chart">
-            <defs>
-              <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="{selectedAccount.color}40" />
-                <stop offset="100%" stop-color="{selectedAccount.color}05" />
-              </linearGradient>
-            </defs>
             {#if areaPath}
-              <path d={areaPath} fill="url(#areaGrad)" />
+              <path d={areaPath} fill="var(--color-expense-dim)" />
             {/if}
             {#if path}
-              <path d={path} fill="none" stroke={selectedAccount.color} stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+              <path d={path} fill="none" stroke={selectedAccount.color} stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             {/if}
             {#each sortedBalances as b, i}
               {@const x = CHART_PAD + i * balStepX}
               {@const y = CHART_PAD + ((maxBal - b.balance) / balRange) * (CHART_H - CHART_PAD * 2)}
-              <circle cx={x} cy={y} r="4" fill={selectedAccount.color} stroke="#fff" stroke-width="2">
+              <circle cx={x} cy={y} r="3" fill={selectedAccount.color} stroke="var(--color-bg)" stroke-width="1">
                 <title>{new Date(b.date + 'T00:00:00').toLocaleDateString('it-IT')}: {formatCents(b.balance)}</title>
               </circle>
             {/each}
@@ -713,21 +664,21 @@
         <div class="chart-card">
           <h3 class="section-title">Variazioni Mensili</h3>
           <div class="delta-chart-container">
-            <svg viewBox="0 0 {Math.max(monthlyDeltas.length * 50, 200)} 180" class="delta-chart">
+            <svg viewBox="0 0 {Math.max(monthlyDeltas.length * 50, 200)} 170" class="delta-chart">
               {#each monthlyDeltas as d, i}
-                {@const barW = 30}
-                {@const barGap = Math.max(10, Math.min(30, 400 / monthlyDeltas.length - barW))}
+                {@const barW = 28}
+                {@const barGap = Math.max(8, Math.min(28, 400 / monthlyDeltas.length - barW))}
                 {@const x = i * (barW + barGap) + 10}
                 {@const delta = d.delta ?? 0}
-                {@const absH = Math.abs(delta) / maxDelta * 140}
+                {@const absH = Math.abs(delta) / maxDelta * 130}
                 {@const h = Math.max(3, absH)}
                 {@const isPositive = delta >= 0}
-                {@const y = isPositive ? 160 - h : 160}
+                {@const y = isPositive ? 150 - h : 150}
                 <rect x={x} y={y} width={barW} height={h}
-                  fill={isPositive ? 'var(--color-positive)' : 'var(--color-negative)'} rx="3">
+                  fill={isPositive ? 'var(--color-positive)' : 'var(--color-negative)'} rx="0">
                   <title>{monthNamesShort[d.month - 1]} {d.year}: {formatCents(delta)}</title>
                 </rect>
-                <text x={x + barW / 2} y={174} text-anchor="middle" class="delta-label">{monthNamesShort[d.month - 1]}</text>
+                <text x={x + barW / 2} y={164} text-anchor="middle" class="delta-label">{monthNamesShort[d.month - 1]}</text>
               {/each}
             </svg>
           </div>
@@ -826,8 +777,8 @@
                 <span class="log-cell log-bal log-bal-value">{formatCents(log.balance)}</span>
                 <span class="log-cell log-note">{log.note ?? '—'}</span>
                 <span class="log-cell log-actions">
-                  <button class="log-btn" onclick={() => openEditBalance(log)} aria-label="Modifica">✎</button>
-                  <button class="log-btn log-btn-del" onclick={() => deleteBalance(log.id)} aria-label="Elimina">✕</button>
+                  <button class="log-btn" onclick={() => openEditBalance(log)} aria-label="Modifica">[edit]</button>
+                  <button class="log-btn log-btn-del" onclick={() => deleteBalance(log.id)} aria-label="Elimina">[del]</button>
                 </span>
               </div>
             {/each}
@@ -876,7 +827,7 @@
       <label class="field">
         <span class="field-label">Colore</span>
         <div class="color-picker-row">
-          {#each ['#2563eb', '#6366f1', '#8b5cf6', '#ec4899', '#f97316', '#16a34a', '#14b8a6', '#6b7280'] as c}
+          {#each ['#3399ff', '#ff7700', '#8b5cf6', '#ec4899', '#16a34a', '#14b8a6', '#6b7280', '#e4e4e8'] as c}
             <button
               class="color-swatch {formColor === c ? 'color-swatch-active' : ''}"
               style="background: {c}"
@@ -936,17 +887,16 @@
     justify-content: space-between;
     margin-bottom: var(--space-lg);
   }
-  .page-title { font-size: var(--text-xl); }
+  .page-title { font-size: var(--text-base); font-family: var(--font-mono); }
 
   /* ── Loading / Error / Empty ────────────────────────────────────────────── */
   .loading { display: flex; flex-direction: column; align-items: center; gap: var(--space-md); padding: var(--space-2xl); color: var(--color-text-secondary); font-size: var(--text-sm); }
-  .spinner { width: 28px; height: 28px; border: 3px solid var(--slate-200); border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .error-card { padding: var(--space-md); background: var(--color-surface); border: 1px solid var(--color-negative); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: var(--space-sm); }
-  .empty-state { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-2xl); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); text-align: center; }
-  .empty-icon { opacity: 0.4; margin-bottom: var(--space-sm); }
-  .empty-text { font-size: var(--text-base); font-weight: 600; }
-  .empty-sub { font-size: var(--text-sm); }
+  .loading-text { font-family: var(--font-mono); }
+  .error-card { padding: var(--space-md); background: var(--color-surface); border: 1px solid var(--color-negative); display: flex; flex-direction: column; gap: var(--space-sm); }
+  .empty-state { display: flex; flex-direction: column; align-items: center; gap: var(--space-sm); padding: var(--space-2xl); background: var(--color-surface); border: 1px solid var(--color-border); text-align: center; }
+  .empty-symbol { color: var(--color-text-dim); font-family: var(--font-mono); font-size: var(--text-lg); margin-bottom: var(--space-sm); }
+  .empty-text { font-size: var(--text-sm); font-weight: 600; font-family: var(--font-mono); }
+  .empty-sub { font-size: var(--text-xs); font-family: var(--font-mono); }
 
   /* ════════════════════════════════════════════════════════════════════════ */
   /* WEALTH OVERVIEW                                                         */
@@ -955,50 +905,50 @@
     padding: var(--space-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
     margin-bottom: var(--space-lg);
   }
 
   .wealth-hero {
     text-align: center;
     padding-bottom: var(--space-lg);
-    border-bottom: 1px solid var(--slate-100);
+    border-bottom: 1px solid var(--color-border);
     margin-bottom: var(--space-lg);
   }
   .wealth-hero-label {
     display: block;
-    font-size: var(--text-xs);
+    font-size: 10px;
     font-weight: 500;
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: var(--space-xs);
+    font-family: var(--font-mono);
   }
   .wealth-hero-amount {
     display: block;
     font-family: var(--font-mono);
     font-weight: 700;
-    font-size: var(--text-2xl);
+    font-size: var(--text-xl);
     margin-bottom: var(--space-xs);
   }
   .wealth-hero-sub {
     font-size: var(--text-sm);
+    font-family: var(--font-mono);
   }
 
   .wealth-title {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     font-weight: 600;
     margin-bottom: var(--space-md);
+    font-family: var(--font-mono);
   }
 
   .wealth-stacked-bar {
     display: flex;
-    height: 8px;
-    border-radius: var(--radius-full);
+    height: 6px;
     overflow: hidden;
     margin-bottom: var(--space-md);
-    background: var(--slate-100);
+    background: var(--color-border);
   }
   .wealth-bar-segment {
     height: 100%;
@@ -1013,23 +963,22 @@
   }
   .wealth-type-row {
     display: grid;
-    grid-template-columns: 1.5rem 1fr 2rem 1fr 7rem 3.5rem;
+    grid-template-columns: 1fr 2rem 1fr 7rem 3.5rem;
     align-items: center;
     gap: var(--space-sm);
-    font-size: var(--text-sm);
-  }
-  .wealth-type-icon { font-size: 1rem; text-align: center; }
-  .wealth-type-label { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .wealth-type-count {
     font-size: var(--text-xs);
+  }
+  .wealth-type-label { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+  .wealth-type-count {
+    font-size: 10px;
     color: var(--color-text-secondary);
     text-align: center;
     font-family: var(--font-mono);
   }
-  .wealth-type-bar-track { height: 16px; background: var(--slate-100); border-radius: var(--radius-sm); overflow: hidden; }
-  .wealth-type-bar-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.3s ease; min-width: 3px; }
+  .wealth-type-bar-track { height: 12px; background: var(--color-border); overflow: hidden; }
+  .wealth-type-bar-fill { height: 100%; transition: width 0.3s ease; min-width: 3px; }
   .wealth-type-amount { font-family: var(--font-mono); font-weight: 600; text-align: right; font-size: var(--text-xs); }
-  .wealth-type-pct { font-family: var(--font-mono); color: var(--color-text-secondary); text-align: right; font-size: var(--text-xs); }
+  .wealth-type-pct { font-family: var(--font-mono); color: var(--color-text-secondary); text-align: right; font-size: 10px; }
 
   /* ── Account grid ──────────────────────────────────────────────────────── */
   .accounts-grid {
@@ -1047,67 +996,64 @@
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-left: 3px solid var(--accent-color);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
     cursor: pointer;
-    transition: box-shadow 0.2s, border-color 0.2s;
+    transition: border-color 0.15s;
     text-align: left;
-    font-family: inherit;
+    font-family: var(--font-mono);
     color: var(--color-text);
     width: 100%;
   }
-  .account-card:hover { box-shadow: var(--shadow-md); }
-  .account-card-selected { border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-color), var(--shadow-sm); }
+  .account-card:hover { border-color: var(--accent-color); }
+  .account-card-selected { border-color: var(--accent-color); }
 
   .acct-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-xs); }
-  .acct-icon { font-size: 1.25rem; }
-  .acct-type-badge { font-size: 10px; font-weight: 500; color: var(--color-text-secondary); padding: 0.125rem 0.375rem; background: var(--slate-100); border-radius: var(--radius-full); }
-  .acct-name { font-weight: 600; font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .acct-type-badge { font-size: 10px; font-weight: 500; color: var(--color-text-secondary); padding: 0.125rem 0.375rem; background: var(--color-surface-raised); }
+  .acct-name { font-weight: 600; font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .acct-balance { margin-top: var(--space-xs); }
   .acct-balance-amount { font-family: var(--font-mono); font-weight: 700; font-size: var(--text-sm); }
   .acct-balance-none { font-family: var(--font-mono); font-size: var(--text-sm); }
-  .acct-actions { display: flex; gap: 0.25rem; margin-top: var(--space-xs); opacity: 0; transition: opacity 0.15s; }
+  .acct-actions { display: flex; gap: var(--space-xs); margin-top: var(--space-xs); opacity: 0; transition: opacity 0.1s; }
   .account-card:hover .acct-actions { opacity: 1; }
-  .acct-btn { background: none; border: none; color: var(--color-text-secondary); cursor: pointer; font-size: 12px; padding: 0.125rem 0.25rem; border-radius: var(--radius-sm); transition: color 0.15s, background 0.15s; }
-  .acct-btn:hover { color: var(--color-primary); background: var(--blue-50); }
-  .acct-btn-del:hover { color: var(--color-negative); background: #fef2f2; }
+  .acct-btn { background: none; border: 1px solid var(--color-border); color: var(--color-text-secondary); cursor: pointer; font-size: 10px; padding: 0.125rem 0.25rem; transition: color 0.1s, border-color 0.1s; font-family: var(--font-mono); }
+  .acct-btn:hover { color: var(--color-primary); border-color: var(--color-primary); }
+  .acct-btn-del:hover { color: var(--color-negative); border-color: var(--color-negative); }
 
   /* ── Detail panel ──────────────────────────────────────────────────────── */
   .detail-panel { display: flex; flex-direction: column; gap: var(--space-md); }
 
-  .balance-hero { display: flex; align-items: center; justify-content: space-between; padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-left: 4px solid var(--accent-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+  .balance-hero { display: flex; align-items: center; justify-content: space-between; padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-left: 3px solid var(--accent-color); }
   .balance-hero-left { display: flex; flex-direction: column; gap: 0.125rem; }
-  .balance-label { font-size: var(--text-xs); font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-  .balance-amount { font-family: var(--font-mono); font-weight: 700; font-size: var(--text-2xl); }
-  .balance-date { font-size: var(--text-xs); }
+  .balance-label { font-size: 10px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); }
+  .balance-amount { font-family: var(--font-mono); font-weight: 700; font-size: var(--text-lg); }
+  .balance-date { font-size: var(--text-xs); font-family: var(--font-mono); }
 
   /* ── Charts ────────────────────────────────────────────────────────────── */
-  .chart-card { padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
-  .section-title { font-size: var(--text-base); font-weight: 600; margin-bottom: var(--space-md); }
-  .line-chart { width: 100%; height: 220px; display: block; }
+  .chart-card { padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); }
+  .section-title { font-size: var(--text-sm); font-weight: 600; margin-bottom: var(--space-md); font-family: var(--font-mono); }
+  .line-chart { width: 100%; height: 200px; display: block; }
   .delta-chart-container { width: 100%; overflow-x: auto; }
-  .delta-chart { width: 100%; height: 180px; display: block; min-width: 200px; }
-  .delta-label { font-size: 9px; fill: var(--color-text-secondary); font-family: var(--font-sans); }
+  .delta-chart { width: 100%; height: 170px; display: block; min-width: 200px; }
+  .delta-label { font-size: 9px; fill: var(--color-text-secondary); font-family: var(--font-mono); }
 
   /* ── Balance log table ─────────────────────────────────────────────────── */
-  .log-table-card { padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+  .log-table-card { padding: var(--space-lg); background: var(--color-surface); border: 1px solid var(--color-border); }
   .log-table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-md); }
-  .log-count { font-size: var(--text-xs); color: var(--color-text-secondary); font-weight: 500; }
-  .empty-log { font-size: var(--text-sm); text-align: center; padding: var(--space-md); }
+  .log-count { font-size: 10px; color: var(--color-text-secondary); font-weight: 500; font-family: var(--font-mono); }
+  .empty-log { font-size: var(--text-xs); text-align: center; padding: var(--space-md); font-family: var(--font-mono); }
   .log-table { display: flex; flex-direction: column; }
-  .log-row { display: grid; grid-template-columns: 7rem 1fr 1fr 4rem; gap: var(--space-sm); padding: 0.5rem 0; border-bottom: 1px solid var(--slate-100); font-size: var(--text-sm); align-items: center; }
+  .log-row { display: grid; grid-template-columns: 7rem 1fr 1fr 5rem; gap: var(--space-sm); padding: 0.4rem 0; border-bottom: 1px solid var(--color-border); font-size: var(--text-xs); align-items: center; }
   .log-row:last-child { border-bottom: none; }
-  .log-row-header { font-size: var(--text-xs); font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid var(--slate-200); padding: 0.375rem 0; }
+  .log-row-header { font-size: 10px; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid var(--color-border); padding: 0.3rem 0; font-family: var(--font-mono); }
   .log-date { font-family: var(--font-mono); color: var(--color-text-secondary); }
   .log-bal { font-family: var(--font-mono); font-weight: 600; }
-  .log-bal-value { font-size: var(--text-sm); }
-  .log-note { color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .log-actions { display: flex; gap: 0.25rem; justify-content: flex-end; }
-  .log-btn { background: none; border: none; color: var(--color-text-secondary); cursor: pointer; font-size: 12px; padding: 0.125rem 0.25rem; border-radius: var(--radius-sm); transition: color 0.15s, background 0.15s; }
-  .log-btn:hover { color: var(--color-primary); background: var(--blue-50); }
-  .log-btn-del:hover { color: var(--color-negative); background: #fef2f2; }
+  .log-bal-value { font-size: var(--text-xs); }
+  .log-note { color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+  .log-actions { display: flex; gap: var(--space-xs); justify-content: flex-end; }
+  .log-btn { background: none; border: 1px solid var(--color-border); color: var(--color-text-secondary); cursor: pointer; font-size: 10px; padding: 0.125rem 0.25rem; transition: color 0.1s, border-color 0.1s; font-family: var(--font-mono); }
+  .log-btn:hover { color: var(--color-primary); border-color: var(--color-primary); }
+  .log-btn-del:hover { color: var(--color-negative); border-color: var(--color-negative); }
 
-  /* ── Tag suggestions (tipo selector) ──────────────────────────────────────── */
+  /* ── Tag suggestions ──────────────────────────────────────────────────── */
   .tag-suggestions {
     display: flex;
     flex-wrap: wrap;
@@ -1115,16 +1061,15 @@
     margin-top: var(--space-xs);
   }
   .tag {
-    padding: 0.25rem 0.65rem;
-    font-size: var(--text-xs);
+    padding: 0.2rem 0.5rem;
+    font-size: 10px;
     font-weight: 500;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-full);
     background: var(--color-surface);
     color: var(--color-text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
-    font-family: inherit;
+    transition: all 0.1s;
+    font-family: var(--font-mono);
     line-height: 1.4;
   }
   .tag:hover {
@@ -1133,35 +1078,35 @@
   }
   .tag-active {
     background: var(--color-primary);
-    color: #fff;
+    color: var(--color-bg);
     border-color: var(--color-primary);
   }
   .tag-active:hover {
-    color: #fff;
+    color: var(--color-bg);
   }
 
   /* ── Modal ──────────────────────────────────────────────────────────────── */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: var(--space-md); }
-  .modal { width: 100%; max-width: 420px; background: var(--color-surface); border-radius: var(--radius-xl); box-shadow: var(--shadow-xl); padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-md); }
-  .modal-title { font-size: var(--text-lg); font-weight: 600; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 200; padding: var(--space-md); }
+  .modal { width: 100%; max-width: 420px; background: var(--color-surface); border: 1px solid var(--color-border); padding: var(--space-xl); display: flex; flex-direction: column; gap: var(--space-md); }
+  .modal-title { font-size: var(--text-base); font-weight: 600; font-family: var(--font-mono); }
   .field { display: flex; flex-direction: column; gap: 0.25rem; }
-  .field-label { font-size: var(--text-xs); font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-  .field-input { padding: 0.5rem 0.75rem; font-size: var(--text-sm); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text); font-family: inherit; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
-  .field-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+  .field-label { font-size: 10px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-family: var(--font-mono); }
+  .field-input { padding: 0.4rem 0.5rem; font-size: var(--text-xs); border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font-family: var(--font-mono); outline: none; transition: border-color 0.1s; }
+  .field-input:focus { border-color: var(--color-primary); }
   .color-picker-row { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
-  .color-swatch { width: 32px; height: 32px; border-radius: var(--radius-full); border: 2px solid transparent; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
-  .color-swatch:hover { transform: scale(1.1); }
+  .color-swatch { width: 28px; height: 28px; border: 2px solid transparent; cursor: pointer; transition: border-color 0.1s; }
+  .color-swatch:hover { border-color: var(--color-text); }
   .color-swatch-active { border-color: var(--color-text); }
   .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-sm); }
 
-  /* ── Wealth chart section ──────────────────────────────────────────────────── */
+  /* ── Wealth chart section ──────────────────────────────────────────────── */
   .wealth-chart-section {
     margin-top: var(--space-lg);
     padding-top: var(--space-lg);
-    border-top: 1px solid var(--slate-100);
+    border-top: 1px solid var(--color-border);
   }
 
-  /* ── Reconciliation statistics ─────────────────────────────────────────────── */
+  /* ── Reconciliation statistics ─────────────────────────────────────────── */
   .recon-stats-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -1174,19 +1119,20 @@
     gap: 0.125rem;
   }
   .recon-stat-label {
-    font-size: var(--text-xs);
+    font-size: 10px;
     font-weight: 500;
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    font-family: var(--font-mono);
   }
   .recon-stat-value {
     font-family: var(--font-mono);
     font-weight: 600;
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
   }
   .recon-delta-table {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
   }
   .recon-delta-table-scroll {
     overflow-x: auto;
@@ -1194,20 +1140,21 @@
   .recon-delta-table table {
     width: 100%;
     border-collapse: collapse;
+    font-family: var(--font-mono);
   }
   .recon-delta-table th {
     text-align: left;
-    font-size: var(--text-xs);
+    font-size: 10px;
     font-weight: 600;
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 0.375rem 0.5rem;
-    border-bottom: 2px solid var(--slate-200);
+    padding: 0.3rem 0.5rem;
+    border-bottom: 2px solid var(--color-border);
   }
   .recon-delta-table td {
-    padding: 0.375rem 0.5rem;
-    border-bottom: 1px solid var(--slate-100);
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid var(--color-border);
     font-family: var(--font-mono);
   }
   .recon-td-num {
@@ -1218,9 +1165,9 @@
   @media (max-width: 640px) {
     .accounts-grid { grid-template-columns: 1fr 1fr; }
     .balance-hero { flex-direction: column; align-items: flex-start; gap: var(--space-md); }
-    .log-row { grid-template-columns: 6rem 1fr 3rem; }
+    .log-row { grid-template-columns: 6rem 1fr 4rem; }
     .log-note { display: none; }
-    .wealth-type-row { grid-template-columns: 1.5rem 1fr 2rem 5rem; }
+    .wealth-type-row { grid-template-columns: 1fr 2rem 5rem; }
     .wealth-type-bar-track { display: none; }
     .wealth-type-pct { display: none; }
     .recon-stats-grid { grid-template-columns: repeat(2, 1fr); }

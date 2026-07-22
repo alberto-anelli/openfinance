@@ -22,9 +22,10 @@
 
 {#if visible && message}
   <div class="toast toast-{type}" role="alert">
-    <span class="toast-icon">{type === 'success' ? '✓' : '✕'}</span>
+    <span class="toast-icon">{type === 'success' ? 'OK' : 'ER'}</span>
+    <span class="toast-sep">|</span>
     <span class="toast-message">{message}</span>
-    <button class="toast-close" onclick={() => ondismiss?.()}>×</button>
+    <button class="toast-close" onclick={() => ondismiss?.()}>x</button>
   </div>
 {/if}
 
@@ -35,29 +36,28 @@
     right: 1.5rem;
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    padding: 0.75rem 1rem;
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    font-size: var(--text-sm);
-    font-weight: 500;
+    gap: var(--space-xs);
+    padding: 0.5rem 0.75rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
     z-index: 1000;
-    animation: slideIn 0.3s ease-out;
     max-width: 24rem;
   }
   .toast-success {
-    background: #dcfce7;
-    color: #166534;
-    border: 1px solid #bbf7d0;
+    background: var(--color-surface);
+    color: var(--color-positive);
+    border: 1px solid var(--color-positive);
   }
   .toast-error {
-    background: #fef2f2;
-    color: #991b1b;
-    border: 1px solid #fecaca;
+    background: var(--color-surface);
+    color: var(--color-negative);
+    border: 1px solid var(--color-negative);
   }
   .toast-icon {
-    font-size: var(--text-lg);
     font-weight: 700;
+  }
+  .toast-sep {
+    opacity: 0.4;
   }
   .toast-message {
     flex: 1;
@@ -65,15 +65,16 @@
   .toast-close {
     background: none;
     border: none;
-    font-size: var(--text-lg);
     cursor: pointer;
     color: inherit;
     padding: 0 0.25rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    opacity: 0.6;
     line-height: 1;
   }
-  @keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+  .toast-close:hover {
+    opacity: 1;
   }
 
   @media (max-width: 640px) {

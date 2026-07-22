@@ -274,19 +274,19 @@
   }
 
   // ── Chart helpers ──────────────────────────────────────────────────────
-  const BAR_W = 32;
+  const BAR_W = 30;
   const BAR_GAP = 6;
-  const CHART_H = 200;
+  const CHART_H = 180;
   const CHART_PAD = 4;
 
   // Wealth history chart dimensions
   const WH_W = 600;
-  const WH_H = 180;
+  const WH_H = 160;
   const WH_PAD = 6;
 
   function barHeight(val: number, max: number): number {
     if (max === 0) return 0;
-    return Math.max(4, (val / max) * (CHART_H - CHART_PAD * 2));
+    return Math.max(3, (val / max) * (CHART_H - CHART_PAD * 2));
   }
 
   function formatShortCents(c: number): string {
@@ -355,18 +355,13 @@
 <!-- ── Month sub-navigation ────────────────────────────────────────────── -->
 {#if selectedMonth !== null}
   <div class="month-subnav">
-    <button class="subnav-btn" onclick={prevMonth} aria-label="Mese precedente">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
+    <button class="subnav-btn" onclick={prevMonth} aria-label="Mese precedente">&#x25C0;</button>
     <button class="subnav-label" onclick={goToYearOverview}>
       {monthNames[selectedMonth - 1]} {selectedYear}
     </button>
-    <button class="subnav-btn" onclick={nextMonth} aria-label="Mese successivo">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </button>
+    <button class="subnav-btn" onclick={nextMonth} aria-label="Mese successivo">&#x25B6;</button>
     <button class="subnav-back" onclick={goToYearOverview}>
-      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M12 7H2M5 3.5L2 7l3 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Vista annuale
+      &lt; Vista annuale
     </button>
   </div>
 {/if}
@@ -374,8 +369,7 @@
 <!-- ── Loading / Error ─────────────────────────────────────────────────── -->
 {#if loading}
   <div class="loading">
-    <div class="spinner"></div>
-    <p>Caricamento...</p>
+    <p class="loading-text">Caricamento...</p>
   </div>
 {:else if error}
   <Card variant="expense" padding="md">
@@ -393,27 +387,21 @@
     {#if yearSummary}
       <div class="summary-cards">
         <div class="stat-card">
-          <span class="stat-icon stat-icon-income">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 3v12M4 8l5-5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
+          <span class="stat-arrow stat-arrow-income">&#x25B2;</span>
           <div class="stat-body">
             <span class="stat-label">Entrate</span>
             <span class="stat-value text-income">{formatCents(yearSummary.totalIncome)}</span>
           </div>
         </div>
         <div class="stat-card">
-          <span class="stat-icon stat-icon-expense">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 3v12M4 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
+          <span class="stat-arrow stat-arrow-expense">&#x25BC;</span>
           <div class="stat-body">
             <span class="stat-label">Uscite</span>
             <span class="stat-value text-expense">{formatCents(yearSummary.totalExpenses)}</span>
           </div>
         </div>
-        <div class="stat-card stat-card-balance {yearSummary.totalDifference >= 0 ? 'balance-pos' : 'balance-neg'}">
-          <span class="stat-icon {yearSummary.totalDifference >= 0 ? 'stat-icon-positive' : 'stat-icon-negative'}">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9h12M9 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          </span>
+        <div class="stat-card">
+          <span class="stat-symbol {yearSummary.totalDifference >= 0 ? 'symbol-positive' : 'symbol-negative'}">&#x25C6;</span>
           <div class="stat-body">
             <span class="stat-label">Saldo</span>
             <span class="stat-value {yearSummary.totalDifference >= 0 ? 'text-positive' : 'text-negative'}">
@@ -474,25 +462,19 @@
           <span class="section-badge">{wealthHistorySorted.length} punti</span>
         </div>
         <svg viewBox="0 0 {WH_W} {WH_H + 24}" class="wealth-trend-chart">
-          <defs>
-            <linearGradient id="ovWhAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="var(--color-positive)40" />
-              <stop offset="100%" stop-color="var(--color-positive)05" />
-            </linearGradient>
-          </defs>
           <!-- Grid lines -->
           <line x1={WH_PAD} y1={WH_PAD} x2={WH_W - WH_PAD} y2={WH_PAD} stroke="var(--color-border)" stroke-width="1" stroke-dasharray="4 4" />
           <line x1={WH_PAD} y1={WH_H / 2} x2={WH_W - WH_PAD} y2={WH_H / 2} stroke="var(--color-border)" stroke-width="1" stroke-dasharray="4 4" />
           <line x1={WH_PAD} y1={WH_H - WH_PAD} x2={WH_W - WH_PAD} y2={WH_H - WH_PAD} stroke="var(--color-border)" stroke-width="1" />
           <!-- Area -->
-          <path d={whAreaPath()} fill="url(#ovWhAreaGrad)" />
+          <path d={whAreaPath()} fill="var(--color-income-dim)" />
           <!-- Line -->
-          <path d={whLinePath()} fill="none" stroke="var(--color-positive)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d={whLinePath()} fill="none" stroke="var(--color-positive)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           <!-- Dots -->
           {#each wealthHistorySorted as w, i}
             {@const x = WH_PAD + i * whStepX}
             {@const y = WH_PAD + ((wealthHistMax - w.netWealth) / wealthHistRange) * (WH_H - WH_PAD * 2)}
-            <circle cx={x} cy={y} r="3" fill="var(--color-positive)" stroke="#fff" stroke-width="1.5">
+            <circle cx={x} cy={y} r="2.5" fill="var(--color-positive)" stroke="var(--color-bg)" stroke-width="1">
               <title>{new Date(w.date + 'T00:00:00').toLocaleDateString('it-IT')}: {formatCents(w.netWealth)}</title>
             </circle>
           {/each}
@@ -506,8 +488,8 @@
         <div class="chart-header">
           <h3 class="section-title">Andamento Mensile</h3>
           <div class="chart-legend">
-            <span class="legend-item"><span class="legend-dot dot-income"></span> Entrate</span>
-            <span class="legend-item"><span class="legend-dot dot-expense"></span> Uscite</span>
+            <span class="legend-item"><span class="legend-rect legend-income"></span> Entrate</span>
+            <span class="legend-item"><span class="legend-rect legend-expense"></span> Uscite</span>
           </div>
         </div>
         <div class="chart-container">
@@ -520,17 +502,6 @@
             viewBox="0 0 {12 * (BAR_W + BAR_GAP) + 16} {CHART_H + 28}"
             class="bar-chart"
           >
-            <defs>
-              <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="var(--blue-400)" />
-                <stop offset="100%" stop-color="var(--blue-600)" />
-              </linearGradient>
-              <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="var(--orange-400)" />
-                <stop offset="100%" stop-color="var(--orange-600)" />
-              </linearGradient>
-            </defs>
-
             <!-- Grid lines -->
             <line x1="0" y1={CHART_PAD} x2="100%" y2={CHART_PAD} stroke="var(--color-border)" stroke-width="1" stroke-dasharray="4 4" />
             <line x1="0" y1={CHART_H / 2} x2="100%" y2={CHART_H / 2} stroke="var(--color-border)" stroke-width="1" stroke-dasharray="4 4" />
@@ -547,7 +518,7 @@
               <rect
                 x={x} y={incomeY}
                 width={BAR_W / 2 - 2} height={incomeH}
-                fill="url(#incomeGrad)" rx="3"
+                fill="var(--color-income)" rx="0"
                 class="chart-bar"
                 onclick={() => goToMonth(i + 1)}
                 role="button" tabindex="0"
@@ -560,7 +531,7 @@
               <rect
                 x={x + BAR_W / 2 + 1} y={expenseY}
                 width={BAR_W / 2 - 2} height={expenseH}
-                fill="url(#expenseGrad)" rx="3"
+                fill="var(--color-expense)" rx="0"
                 class="chart-bar"
                 onclick={() => goToMonth(i + 1)}
                 role="button" tabindex="0"
@@ -577,15 +548,11 @@
             {/each}
           </svg>
         </div>
-        <p class="chart-hint">Clicca una barra per esplorare il mese</p>
+        <p class="chart-hint"># clicca una barra per esplorare il mese</p>
       </div>
     {:else}
       <div class="empty-state">
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" class="empty-icon">
-          <rect x="6" y="18" width="8" height="20" rx="2" fill="var(--gray-200)" />
-          <rect x="18" y="10" width="8" height="28" rx="2" fill="var(--gray-200)" />
-          <rect x="30" y="14" width="8" height="24" rx="2" fill="var(--gray-200)" />
-        </svg>
+        <p class="empty-symbol">~ ~ ~</p>
         <p class="empty-text">Nessun dato per il {selectedYear}</p>
         <p class="empty-sub text-muted">Prova con un altro anno</p>
       </div>
@@ -600,27 +567,21 @@
     {#if monthSummary}
       <div class="summary-cards">
         <div class="stat-card">
-          <span class="stat-icon stat-icon-income">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 3v12M4 8l5-5 5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
+          <span class="stat-arrow stat-arrow-income">&#x25B2;</span>
           <div class="stat-body">
             <span class="stat-label">Entrate</span>
             <span class="stat-value text-income">{formatCents(monthSummary.totalIncome)}</span>
           </div>
         </div>
         <div class="stat-card">
-          <span class="stat-icon stat-icon-expense">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 3v12M4 10l5 5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </span>
+          <span class="stat-arrow stat-arrow-expense">&#x25BC;</span>
           <div class="stat-body">
             <span class="stat-label">Uscite</span>
             <span class="stat-value text-expense">{formatCents(monthSummary.totalExpenses)}</span>
           </div>
         </div>
-        <div class="stat-card stat-card-balance {monthSummary.difference >= 0 ? 'balance-pos' : 'balance-neg'}">
-          <span class="stat-icon {monthSummary.difference >= 0 ? 'stat-icon-positive' : 'stat-icon-negative'}">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9h12M9 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          </span>
+        <div class="stat-card">
+          <span class="stat-symbol {monthSummary.difference >= 0 ? 'symbol-positive' : 'symbol-negative'}">&#x25C6;</span>
           <div class="stat-body">
             <span class="stat-label">Saldo</span>
             <span class="stat-value {monthSummary.difference >= 0 ? 'text-positive' : 'text-negative'}">
@@ -740,21 +701,19 @@
   }
   .year-input {
     width: 5.5rem;
-    padding: 0.3rem 0.5rem;
-    font-size: var(--text-xl);
+    padding: 0.25rem 0.5rem;
+    font-size: var(--text-base);
     font-weight: 700;
     text-align: center;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
+    background: var(--color-bg);
     color: var(--color-text);
-    font-family: var(--font-sans);
+    font-family: var(--font-mono);
     outline: none;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.1s;
   }
   .year-input:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
   }
   .month-indicator {
     display: flex;
@@ -762,12 +721,11 @@
     gap: var(--space-xs);
   }
   .month-indicator-label {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     font-weight: 500;
     color: var(--color-text-secondary);
-    padding: 0.25rem 0.75rem;
-    background: var(--gray-100);
-    border-radius: var(--radius-full);
+    padding: 0.25rem 0.5rem;
+    background: var(--color-surface-raised);
   }
 
   .month-subnav {
@@ -781,51 +739,48 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
     background: var(--color-surface);
     color: var(--color-text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
-    font-family: inherit;
+    transition: all 0.1s;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
   }
   .subnav-btn:hover {
     border-color: var(--color-primary);
     color: var(--color-primary);
-    background: var(--blue-50);
   }
   .subnav-label {
-    padding: 0.3rem 0.75rem;
-    font-size: var(--text-sm);
+    padding: 0.25rem 0.5rem;
+    font-size: var(--text-xs);
     font-weight: 600;
     color: var(--color-text);
-    border: none;
-    border-radius: var(--radius-md);
-    background: var(--gray-100);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-raised);
     cursor: pointer;
-    transition: background 0.15s;
-    font-family: inherit;
+    transition: background 0.1s;
+    font-family: var(--font-mono);
   }
   .subnav-label:hover {
-    background: var(--gray-200);
+    background: var(--color-border);
   }
   .subnav-back {
     display: flex;
     align-items: center;
     gap: 0.25rem;
     margin-left: auto;
-    padding: 0.3rem 0.6rem;
+    padding: 0.25rem 0.5rem;
     font-size: var(--text-xs);
     font-weight: 500;
     color: var(--color-text-secondary);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
     background: var(--color-surface);
     cursor: pointer;
-    transition: all 0.15s;
-    font-family: inherit;
+    transition: all 0.1s;
+    font-family: var(--font-mono);
   }
   .subnav-back:hover {
     border-color: var(--color-primary);
@@ -842,16 +797,8 @@
     color: var(--color-text-secondary);
     font-size: var(--text-sm);
   }
-  .spinner {
-    width: 28px;
-    height: 28px;
-    border: 3px solid var(--gray-200);
-    border-top-color: var(--color-primary);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+  .loading-text {
+    font-family: var(--font-mono);
   }
 
   /* ── Summary stat cards ─────────────────────────────────────────────────── */
@@ -868,47 +815,20 @@
     padding: var(--space-md);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.2s;
+    transition: border-color 0.1s;
   }
   .stat-card:hover {
-    box-shadow: var(--shadow-md);
+    border-color: var(--color-text-secondary);
   }
-  .stat-card-balance {
-    border-left: 3px solid var(--color-border);
-  }
-  .balance-pos {
-    border-left-color: var(--color-positive);
-  }
-  .balance-neg {
-    border-left-color: var(--color-negative);
-  }
-  .stat-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    border-radius: var(--radius-md);
+  .stat-arrow {
+    font-size: 14px;
     flex-shrink: 0;
   }
-  .stat-icon-income {
-    background: var(--blue-50);
-    color: var(--blue-600);
-  }
-  .stat-icon-expense {
-    background: var(--orange-50);
-    color: var(--orange-600);
-  }
-  .stat-icon-positive {
-    background: #f0fdf4;
-    color: var(--color-positive);
-  }
-  .stat-icon-negative {
-    background: #fef2f2;
-    color: var(--color-negative);
-  }
+  .stat-arrow-income { color: var(--color-income); }
+  .stat-arrow-expense { color: var(--color-expense); }
+  .stat-symbol { font-size: 12px; flex-shrink: 0; }
+  .symbol-positive { color: var(--color-positive); }
+  .symbol-negative { color: var(--color-negative); }
   .stat-body {
     display: flex;
     flex-direction: column;
@@ -916,16 +836,17 @@
     min-width: 0;
   }
   .stat-label {
-    font-size: var(--text-xs);
+    font-size: 10px;
     font-weight: 500;
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    font-family: var(--font-mono);
   }
   .stat-value {
     font-family: var(--font-mono);
     font-weight: 700;
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
     overflow: hidden;
     text-overflow: ellipsis;
   }
@@ -935,44 +856,43 @@
     padding: var(--space-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
     margin-bottom: var(--space-lg);
   }
 
   .wealth-hero {
     text-align: center;
     padding-bottom: var(--space-lg);
-    border-bottom: 1px solid var(--gray-100);
+    border-bottom: 1px solid var(--color-border);
     margin-bottom: var(--space-lg);
   }
   .wealth-hero-label {
     display: block;
-    font-size: var(--text-xs);
+    font-size: 10px;
     font-weight: 500;
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-bottom: var(--space-xs);
+    font-family: var(--font-mono);
   }
   .wealth-hero-amount {
     display: block;
     font-family: var(--font-mono);
     font-weight: 700;
-    font-size: var(--text-2xl);
+    font-size: var(--text-xl);
     margin-bottom: var(--space-xs);
   }
   .wealth-hero-sub {
     font-size: var(--text-sm);
+    font-family: var(--font-mono);
   }
 
   .wealth-stacked-bar {
     display: flex;
-    height: 8px;
-    border-radius: var(--radius-full);
+    height: 6px;
     overflow: hidden;
     margin-bottom: var(--space-md);
-    background: var(--gray-100);
+    background: var(--color-border);
   }
   .wealth-bar-segment {
     height: 100%;
@@ -981,9 +901,9 @@
   }
   .wealth-bar-segment:nth-child(1) { background: var(--blue-500); }
   .wealth-bar-segment:nth-child(2) { background: var(--orange-500); }
-  .wealth-bar-segment:nth-child(3) { background: var(--green-500); }
-  .wealth-bar-segment:nth-child(4) { background: var(--purple-500); }
-  .wealth-bar-segment:nth-child(5) { background: var(--pink-500); }
+  .wealth-bar-segment:nth-child(3) { background: var(--grey-500); }
+  .wealth-bar-segment:nth-child(4) { background: var(--grey-400); }
+  .wealth-bar-segment:nth-child(5) { background: var(--grey-300); }
 
   .wealth-type-list {
     display: flex;
@@ -995,27 +915,25 @@
     grid-template-columns: 1fr 2rem 1fr 7rem 3.5rem;
     align-items: center;
     gap: var(--space-sm);
-    font-size: var(--text-sm);
-  }
-  .wealth-type-label { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .wealth-type-count {
     font-size: var(--text-xs);
+  }
+  .wealth-type-label { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); }
+  .wealth-type-count {
+    font-size: 10px;
     color: var(--color-text-secondary);
     text-align: center;
     font-family: var(--font-mono);
   }
-  .wealth-type-bar-track { height: 16px; background: var(--gray-100); border-radius: var(--radius-sm); overflow: hidden; }
-  .wealth-type-bar-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.3s ease; min-width: 3px; background: var(--blue-500); }
+  .wealth-type-bar-track { height: 12px; background: var(--color-border); overflow: hidden; }
+  .wealth-type-bar-fill { height: 100%; transition: width 0.3s ease; min-width: 3px; background: var(--blue-500); }
   .wealth-type-amount { font-family: var(--font-mono); font-weight: 600; text-align: right; font-size: var(--text-xs); }
-  .wealth-type-pct { font-family: var(--font-mono); color: var(--color-text-secondary); text-align: right; font-size: var(--text-xs); }
+  .wealth-type-pct { font-family: var(--font-mono); color: var(--color-text-secondary); text-align: right; font-size: 10px; }
 
   /* ── Chart card ─────────────────────────────────────────────────────────── */
   .chart-card {
     padding: var(--space-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
     margin-bottom: var(--space-md);
   }
   .chart-header {
@@ -1027,13 +945,15 @@
     gap: var(--space-sm);
   }
   .section-title {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
     font-weight: 600;
+    font-family: var(--font-mono);
   }
   .section-subtitle {
-    font-size: var(--text-xs);
+    font-size: 10px;
     color: var(--color-text-secondary);
     margin-bottom: var(--space-md);
+    font-family: var(--font-mono);
   }
 
   .chart-container {
@@ -1046,10 +966,10 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    height: 200px;
+    height: 180px;
     padding-right: 6px;
     padding-bottom: 28px;
-    font-size: var(--text-xs);
+    font-size: 10px;
     color: var(--color-text-secondary);
     font-family: var(--font-mono);
     text-align: right;
@@ -1057,53 +977,51 @@
   }
   .bar-chart {
     width: calc(100% - 2.5rem);
-    height: 228px;
+    height: 208px;
     display: block;
   }
   .chart-bar {
     cursor: pointer;
-    transition: opacity 0.2s, transform 0.15s;
+    transition: opacity 0.15s;
   }
   .chart-bar:hover {
-    opacity: 0.8;
-    transform: scaleY(1.02);
-    transform-origin: bottom;
+    opacity: 0.7;
   }
   .chart-label {
-    font-size: 10px;
+    font-size: 9px;
     fill: var(--color-text-secondary);
-    font-family: var(--font-sans);
+    font-family: var(--font-mono);
   }
   .chart-legend {
     display: flex;
     gap: var(--space-md);
-    font-size: var(--text-xs);
+    font-size: 10px;
     color: var(--color-text-secondary);
+    font-family: var(--font-mono);
   }
   .legend-item {
     display: flex;
     align-items: center;
     gap: 0.3rem;
   }
-  .legend-dot {
+  .legend-rect {
     display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 3px;
+    width: 8px;
+    height: 8px;
   }
-  .dot-income { background: var(--blue-400); }
-  .dot-expense { background: var(--orange-400); }
+  .legend-income { background: var(--color-income); }
+  .legend-expense { background: var(--color-expense); }
   .chart-hint {
     margin-top: var(--space-sm);
-    font-size: var(--text-xs);
-    color: var(--color-text-secondary);
-    font-style: italic;
+    font-size: 10px;
+    color: var(--color-text-dim);
+    font-family: var(--font-mono);
     text-align: center;
   }
 
   .wealth-trend-chart {
     width: 100%;
-    height: 204px;
+    height: 184px;
     display: block;
   }
 
@@ -1116,20 +1034,23 @@
     padding: var(--space-2xl);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
     text-align: center;
   }
-  .empty-icon {
-    opacity: 0.4;
+  .empty-symbol {
+    color: var(--color-text-dim);
+    font-family: var(--font-mono);
+    font-size: var(--text-lg);
     margin-bottom: var(--space-sm);
   }
   .empty-text {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
     font-weight: 600;
     color: var(--color-text);
+    font-family: var(--font-mono);
   }
   .empty-sub {
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
+    font-family: var(--font-mono);
   }
 
   /* ── Category breakdown ─────────────────────────────────────────────────── */
@@ -1137,8 +1058,6 @@
     padding: var(--space-lg);
     background: var(--color-surface);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
     margin-bottom: var(--space-md);
   }
   .section-card-header {
@@ -1150,12 +1069,12 @@
     gap: var(--space-xs);
   }
   .section-badge {
-    font-size: var(--text-xs);
+    font-size: 10px;
     font-weight: 500;
     color: var(--color-text-secondary);
-    padding: 0.125rem 0.5rem;
-    background: var(--gray-100);
-    border-radius: var(--radius-full);
+    padding: 0.125rem 0.4rem;
+    background: var(--color-surface-raised);
+    font-family: var(--font-mono);
   }
 
   .cat-chart {
@@ -1168,31 +1087,30 @@
     grid-template-columns: 8rem 1fr 7rem 3.5rem;
     align-items: center;
     gap: var(--space-sm);
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
   }
   .cat-name {
     font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: var(--font-mono);
   }
   .cat-bar-track {
-    height: 22px;
-    background: var(--gray-100);
-    border-radius: var(--radius-sm);
+    height: 18px;
+    background: var(--color-border);
     overflow: hidden;
   }
   .cat-bar-fill {
     height: 100%;
-    border-radius: var(--radius-sm);
-    transition: width 0.4s ease;
+    transition: width 0.3s ease;
     min-width: 3px;
   }
   .cat-bar-expense {
-    background: linear-gradient(90deg, var(--orange-300), var(--orange-500));
+    background: var(--color-expense);
   }
   .cat-bar-income {
-    background: linear-gradient(90deg, var(--blue-300), var(--blue-500));
+    background: var(--color-income);
   }
   .cat-amount {
     font-family: var(--font-mono);
@@ -1204,7 +1122,7 @@
     font-family: var(--font-mono);
     color: var(--color-text-secondary);
     text-align: right;
-    font-size: var(--text-xs);
+    font-size: 10px;
   }
 
   /* ── Transaction list ───────────────────────────────────────────────────── */
@@ -1219,15 +1137,15 @@
     grid-template-columns: 4.5rem 1fr 1fr 1fr 7rem;
     align-items: center;
     gap: var(--space-sm);
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--gray-100);
-    font-size: var(--text-sm);
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--text-xs);
   }
   .tx-row:last-child {
     border-bottom: none;
   }
   .tx-date {
-    font-size: var(--text-xs);
+    font-size: 10px;
     color: var(--color-text-secondary);
     font-family: var(--font-mono);
   }
@@ -1236,30 +1154,32 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: var(--font-mono);
   }
   .tx-desc {
-    font-size: var(--text-xs);
+    font-size: 10px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--color-text-secondary);
+    font-family: var(--font-mono);
   }
   .tx-desc-empty {
     /* empty cell for grid alignment */
   }
   .tx-account {
-    font-size: var(--text-xs);
-    font-style: italic;
+    font-size: 10px;
     color: var(--color-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-family: var(--font-mono);
   }
   .tx-amount {
     font-family: var(--font-mono);
     font-weight: 600;
     text-align: right;
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
   }
 
   /* ── Responsive ─────────────────────────────────────────────────────────── */
@@ -1271,12 +1191,8 @@
       gap: var(--space-sm);
       padding: var(--space-sm) var(--space-md);
     }
-    .stat-icon {
-      width: 34px;
-      height: 34px;
-    }
     .stat-value {
-      font-size: var(--text-sm);
+      font-size: var(--text-xs);
     }
     .cat-row {
       grid-template-columns: 5rem 1fr 5rem 2.5rem;
@@ -1293,10 +1209,7 @@
     .tx-account {
       display: none;
     }
-    .chart-card {
-      padding: var(--space-md);
-    }
-    .section-card {
+    .chart-card, .section-card {
       padding: var(--space-md);
     }
   }
